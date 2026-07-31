@@ -1,0 +1,51 @@
+@startuml diagrama-relaciones
+skinparam classAttributeIconSize 0
+skinparam backgroundColor white
+skinparam class {
+    BackgroundColor #F8F9FA
+    BorderColor #2e3350
+    FontSize 13
+}
+
+class Universidad {
+    - nombre: String
+    - ciudad: String
+    + getNombre(): String
+}
+
+class Facultad {
+    - nombre: String
+    + getNombre(): String
+}
+
+class Curso {
+    - codigo: String
+    - nombre: String
+    + getCodigo(): String
+}
+
+class Estudiante {
+    - nombre: String
+    - codigo: String
+    + getNombre(): String
+}
+
+class Calificacion {
+    - nota: double
+    - fecha: String
+    + getNota(): double
+}
+
+' Composición: Universidad crea sus Facultades
+Universidad "1" *-- "1..*" Facultad : tiene
+
+' Composición: Facultad crea sus Cursos
+Facultad "1" *-- "1..*" Curso : ofrece
+
+' Agregación: Estudiante existe independientemente del Curso
+Curso "1..*" o-- "1..*" Estudiante : matricula
+
+' Composición: Calificacion no existe sin Estudiante
+Estudiante "1" *-- "0..*" Calificacion : tiene
+
+@enduml
