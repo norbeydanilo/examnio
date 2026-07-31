@@ -342,6 +342,21 @@ async function hashStr(str) {
   return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
 }
 
+// ── Modo prueba ──
+// Agrega ?modo=prueba a la URL para desactivar eventos, alertas y temporizador.
+// Ejemplo: https://tuusuario.github.io/examinador/examen.html?modo=prueba
+const MODO_PRUEBA = new URLSearchParams(window.location.search).get('modo') === 'prueba';
+
+if (MODO_PRUEBA) {
+  document.title = '⚙ Examen [MODO PRUEBA]';
+  const banner = document.createElement('div');
+  banner.style.cssText = 'position:fixed;top:0;left:0;right:0;height:28px;background:#7c5cbf;color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;z-index:999;letter-spacing:.5px;';
+  banner.textContent = '⚙ MODO PRUEBA — eventos y alertas desactivados';
+  document.body.prepend(banner);
+  // Empujar status-bar hacia abajo
+  document.getElementById('status-bar').style.top = '28px';
+}
+
 // ── Estado ──
 let S = {
   examenId:null, examenData:null, preguntas:[],
@@ -463,7 +478,8 @@ window.doLogin = async () => {
 
     // Guardar passHash en localStorage
     S._passHash = passHash;
-    setupEvents();
+    if (!MODO_PRUEBA) setupEvents();
+    if (!MODO_PRUEBA) startHeartbeat();
     renderHeader();
     startTimer();
     renderQuestion(S.currentIdx);
@@ -484,7 +500,7 @@ window.doLogin = async () => {
 // ── TIMER ──
 function startTimer() {
   const ex = S.examenData;
-  if (!ex.tiempoMinutos || ex.tiempoMinutos <= 0) return;
+  if (MODO_PRUEBA || !ex.tiempoMinutos || ex.tiempoMinutos <= 0) return;
 
   // Calcular tiempo restante desde el inicio guardado
   const saved = localStorage.getItem(LS());
@@ -590,22 +606,28 @@ function renderQuestion(idx) {
 }
 
 // ── RENDER UI POR TIPO ──
+// Quita el prefijo de letra original "A) " "B) " etc. del texto de la opción
+function stripLetra(texto) {
+  return texto.replace(/^[A-Da-d][).\s]+/, '').trim();
+}
+
 function renderAnswerUI(q, idx) {
-  // Las letras A, B, C... se asignan según el orden ALEATORIO actual (no el original)
   switch(q.tipo) {
     case 'unica':
-      return `<ul class="options-list">${q.opciones.map((op,oi)=>`
-        <li class="option-item" id="opt-${idx}-${oi}" onclick="selOpt(${idx},${oi},false)">
-          <div class="option-marker">${String.fromCharCode(65+oi)}</div>
-          <span class="option-text">${op}</span>
-        </li>`).join('')}</ul>`;
+      return '<ul class="options-list">' + q.opciones.map((op,oi)=>
+        '<li class="option-item" id="opt-'+idx+'-'+oi+'" onclick="selOpt('+idx+','+oi+',false)">' +
+        '<div class="option-marker">' + String.fromCharCode(65+oi) + '</div>' +
+        '<span class="option-text">' + stripLetra(op) + '</span>' +
+        '</li>'
+      ).join('') + '</ul>';
 
     case 'multiple':
-      return `<ul class="options-list">${q.opciones.map((op,oi)=>`
-        <li class="option-item option-multiple" id="opt-${idx}-${oi}" onclick="selOpt(${idx},${oi},true)">
-          <div class="option-marker">✓</div>
-          <span class="option-text">${op}</span>
-        </li>`).join('')}</ul>`;
+      return '<ul class="options-list">' + q.opciones.map((op,oi)=>
+        '<li class="option-item option-multiple" id="opt-'+idx+'-'+oi+'" onclick="selOpt('+idx+','+oi+',true)">' +
+        '<div class="option-marker">✓</div>' +
+        '<span class="option-text">' + stripLetra(op) + '</span>' +
+        '</li>'
+      ).join('') + '</ul>';
 
     case 'verdaderoFalso':
       return `<div class="tf-group">
@@ -820,9 +842,19 @@ function setupEvents() {
   window.addEventListener('beforeprint', () => logEvent('Intento de imprimir la página'));
 }
 
+// Los primeros 2 eventos se ignoran silenciosamente
+// (pueden ser diálogos del navegador para guardar contraseña, etc.)
+// A partir del 3ro se registran, muestran alerta y se guardan en Firebase
+const EVENTOS_IGNORADOS = 2;
+
 async function logEvent(tipo) {
   if (S.entregado) return;
+
   S.eventAlertCount++;
+
+  // Ignorar silenciosamente los primeros eventos
+  if (S.eventAlertCount <= EVENTOS_IGNORADOS) return;
+
   const ev = { tipo, pregunta: S.currentIdx+1, hora: new Date().toLocaleTimeString('es-CO'), ts: Date.now() };
   S.eventos.push(ev);
   saveLocal();
@@ -833,7 +865,7 @@ async function logEvent(tipo) {
   setTimeout(() => { b.style.display='none'; }, 3000);
 
   // Contador en status bar
-  document.getElementById('events-count').textContent = `${S.eventos.length} evento${S.eventos.length!==1?'s':''}`;
+  document.getElementById('events-count').textContent = S.eventos.length + ' evento' + (S.eventos.length!==1?'s':'');
 
   // Actualizar widget persistente
   updateAlertWidget();
@@ -848,6 +880,7 @@ async function logEvent(tipo) {
 }
 
 function updateAlertWidget() {
+  if (MODO_PRUEBA) return;
   const n       = S.eventos.length;
   const widget  = document.getElementById('alert-widget');
   const countEl = document.getElementById('widget-count');
@@ -872,6 +905,54 @@ function updateAlertWidget() {
   // Barra de peligro: se llena hasta MAX_WARN eventos
   const pct = Math.min((n / MAX_WARN) * 100, 100);
   barEl.style.width = pct + '%';
+}
+
+// ── HEARTBEAT + DESCONEXIONES ──
+// Envía un pulso a Firebase cada 10 segundos para que el monitor sepa que está online.
+// Si el navegador cierra o pierde conexión, el lastSeen deja de actualizarse.
+function startHeartbeat() {
+  const ref = doc(db,'respuestas',S.examenId,'estudiantes',S.respDocId);
+
+  const sendBeat = async () => {
+    if (S.entregado) return;
+    try {
+      await updateDoc(ref, { lastSeen: serverTimestamp() });
+    } catch(_) {}
+  };
+
+  sendBeat();
+  setInterval(sendBeat, 10000);
+
+  // Registrar cuando la página pierde visibilidad (posible desconexión)
+  document.addEventListener('visibilitychange', async () => {
+    if (document.hidden) {
+      try {
+        await updateDoc(ref, {
+          desconexiones: arrayUnion({
+            hora: new Date().toLocaleTimeString('es-CO'),
+            ts:   Date.now(),
+            tipo: 'oculto',
+          }),
+        });
+      } catch(_) {}
+    } else {
+      // Reconexión — actualizar lastSeen inmediatamente
+      sendBeat();
+    }
+  });
+
+  // Registrar pérdida de conexión a internet
+  window.addEventListener('offline', async () => {
+    try {
+      await updateDoc(ref, {
+        desconexiones: arrayUnion({
+          hora: new Date().toLocaleTimeString('es-CO'),
+          ts:   Date.now(),
+          tipo: 'sin internet',
+        }),
+      });
+    } catch(_) {}
+  });
 }
 
 function showEventAlert(tipo) {

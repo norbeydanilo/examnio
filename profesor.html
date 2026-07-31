@@ -509,24 +509,51 @@ window.loadMonitor = () => {
     document.getElementById('refresh-label').textContent='Actualizado: '+new Date().toLocaleTimeString('es-CO');
   });
 };
-function renderMonitor(students,examen) {
+// Rastrea qué estudiantes están "online" en el monitor
+const ONLINE_TIMEOUT_MS = 15000; // 15 segundos sin heartbeat = desconectado
+
+function renderMonitor(students, examen) {
   document.getElementById('stat-total').textContent  = students.length;
   document.getElementById('stat-done').textContent   = students.filter(s=>s.entregado).length;
   document.getElementById('stat-events').textContent = students.filter(s=>(s.eventos||[]).length>0).length;
-  const grid=document.getElementById('monitor-grid'), numQ=(examen?.preguntas||[]).length;
-  if(!students.length){grid.innerHTML='<div class="empty-state">Ningún estudiante conectado aún.</div>';return;}
-  grid.innerHTML=students.map(s=>{
-    const resp=Object.keys(s.respuestas||{}).length, pct=numQ?Math.round((resp/numQ)*100):0;
-    const events=s.eventos||[], cls=s.entregado?'finished':events.length?'has-events':'';
-    return`<div class="student-card ${cls}">
-      <div class="student-name">${s.nombre}</div>
-      <div class="student-meta">${s.codigo}</div>
-      <div style="font-size:12px;margin-bottom:4px">${resp}/${numQ} respondidas</div>
-      <div class="prog-bar-bg"><div class="prog-bar-fill" style="width:${pct}%"></div></div>
-      ${s.entregado?'<span class="badge badge-green" style="margin-top:6px;display:inline-block">Entregado</span>':''}
-      ${s.entregadoForzado?'<span class="badge badge-yellow" style="margin-top:4px;display:inline-block">Tiempo agotado</span>':''}
-      ${events.length?`<div style="margin-top:6px">${events.slice(-3).map(e=>`<span class="event-chip" title="${e.tipo} — ${e.hora}">⚠ P${e.pregunta}</span>`).join('')}${events.length>3?`<span class="event-chip">+${events.length-3}</span>`:''}</div>`:''}
-    </div>`;
+  const grid  = document.getElementById('monitor-grid');
+  const numQ  = (examen?.preguntas||[]).length;
+  const ahora = Date.now();
+
+  if (!students.length) { grid.innerHTML='<div class="empty-state">Ningún estudiante conectado aún.</div>'; return; }
+
+  grid.innerHTML = students.map(s => {
+    const resp   = Object.keys(s.respuestas||{}).length;
+    const pct    = numQ ? Math.round((resp/numQ)*100) : 0;
+    const events = s.eventos || [];
+    const descon = s.desconexiones || [];
+
+    // Detectar si está online: heartbeat reciente o entregado
+    const lastSeen = s.lastSeen?.seconds ? s.lastSeen.seconds * 1000 : (s.lastSeen || 0);
+    const online   = s.entregado || (ahora - lastSeen < ONLINE_TIMEOUT_MS && lastSeen > 0);
+    const offline  = !s.entregado && lastSeen > 0 && (ahora - lastSeen >= ONLINE_TIMEOUT_MS);
+
+    const cls = s.entregado ? 'finished' : events.length ? 'has-events' : '';
+
+    return '<div class="student-card ' + cls + '">' +
+      '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px;">' +
+        '<div class="student-name">' + s.nombre + '</div>' +
+        '<span style="width:9px;height:9px;border-radius:50%;display:inline-block;flex-shrink:0;margin-top:3px;background:' +
+          (s.entregado ? 'var(--accent2)' : offline ? 'var(--danger)' : 'var(--success)') + '" ' +
+          'title="' + (s.entregado ? 'Entregado' : offline ? 'Desconectado' : 'En línea') + '"></span>' +
+      '</div>' +
+      '<div class="student-meta">' + s.codigo + '</div>' +
+      (offline ? '<div style="font-size:11px;color:var(--danger);margin-bottom:4px;">⚡ Sin conexión</div>' : '') +
+      '<div style="font-size:12px;margin-bottom:4px">' + resp + '/' + numQ + ' respondidas</div>' +
+      '<div class="prog-bar-bg"><div class="prog-bar-fill" style="width:' + pct + '%"></div></div>' +
+      (s.entregado ? '<span class="badge badge-green" style="margin-top:6px;display:inline-block">Entregado</span>' : '') +
+      (s.entregadoForzado ? '<span class="badge badge-yellow" style="margin-top:4px;display:inline-block">Tiempo agotado</span>' : '') +
+      (descon.length ? '<div style="margin-top:6px;font-size:11px;color:var(--text2)">🔌 ' + descon.length + ' desconexión' + (descon.length>1?'es':'') + '</div>' : '') +
+      (events.length ? '<div style="margin-top:6px">' +
+        events.slice(-3).map(e => '<span class="event-chip" title="' + e.tipo + ' — ' + e.hora + '">⚠ P' + e.pregunta + '</span>').join('') +
+        (events.length>3 ? '<span class="event-chip">+' + (events.length-3) + '</span>' : '') +
+      '</div>' : '') +
+    '</div>';
   }).join('');
 }
 function clearMonitor() {
@@ -678,10 +705,19 @@ window.descargarExcel = () => {
   const ptsTotal=(examen.preguntas||[]).reduce((s,q)=>s+q.puntaje,0);
 
   // Construir CSV (compatible con Excel)
-  const rows=[['Nombre','Código','Entregado','Forzado por tiempo','Puntos obtenidos','Puntos totales','Nota','Aprueba','Eventos sospechosos','Inicio','Fin']];
+  const rows=[['Nombre','Código','Entregado','Forzado por tiempo','Puntos obtenidos','Puntos totales','Nota','Aprueba','Eventos sospechosos','Desconexiones','Inicio','Fin']];
   estudiantes.forEach(s=>{
     const auto=calcAuto(s.respuestas||{},examen.preguntas||[]);
     const nota=s.calificacion!==null&&s.calificacion!==undefined?s.calificacion:calcNota(auto,ptsTotal,esc);
+    // Convertir timestamps de Firestore de forma segura
+    const fmtTs = ts => {
+      if (!ts) return '—';
+      try {
+        if (ts.toDate) return ts.toDate().toLocaleString('es-CO');
+        if (ts.seconds) return new Date(ts.seconds * 1000).toLocaleString('es-CO');
+        return new Date(ts).toLocaleString('es-CO');
+      } catch(_) { return '—'; }
+    };
     rows.push([
       s.nombre, s.codigo,
       s.entregado?'Sí':'No',
@@ -689,8 +725,9 @@ window.descargarExcel = () => {
       auto.toFixed(2), ptsTotal, nota,
       nota>=esc.notaApro?'Sí':'No',
       (s.eventos||[]).length,
-      s.inicio?.toDate?.().toLocaleString('es-CO')||'—',
-      s.fin?.toDate?.().toLocaleString('es-CO')||'—',
+      (s.desconexiones||[]).length,
+      fmtTs(s.inicio),
+      fmtTs(s.fin),
     ]);
   });
 
