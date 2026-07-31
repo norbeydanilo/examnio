@@ -389,7 +389,7 @@
 <script type="module">
 import { initializeApp }           from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
 import { getFirestore, doc, getDoc, setDoc, updateDoc,
-         arrayUnion, serverTimestamp,
+         arrayUnion, serverTimestamp, onSnapshot,
          enableIndexedDbPersistence } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
 const firebaseConfig = {
@@ -496,8 +496,9 @@ window.doLogin = async () => {
         throw new Error('Contraseña incorrecta. Usa la contraseña con la que iniciaste este examen.');
       }
       if (existing.entregado) {
-        showPage('page-finish');
         document.getElementById('finish-name').textContent = nombre;
+        showPage('page-finish');
+        checkRetroDisponible();
         return;
       }
       // Restaurar estado
@@ -512,7 +513,12 @@ window.doLogin = async () => {
       if (p.passHash && p.passHash !== passHash) {
         throw new Error('Contraseña incorrecta para esta sesión guardada.');
       }
-      if (p.entregado) { showPage('page-finish'); document.getElementById('finish-name').textContent=nombre; return; }
+      if (p.entregado) {
+        document.getElementById('finish-name').textContent = nombre;
+        showPage('page-finish');
+        checkRetroDisponible();
+        return;
+      }
       // Usar el estado más completo (más respuestas)
       if (Object.keys(p.respuestas||{}).length > Object.keys(S.respuestas).length) {
         S.respuestas = p.respuestas || {};
@@ -908,9 +914,21 @@ window.finishExam = async (forced=false) => {
   if (S.timerInterval) clearInterval(S.timerInterval);
   saveLocal();
   try {
+    // Calcular puntaje automático al entregar para que la retro esté disponible de inmediato
+    const preguntas = S.examenData.preguntas || [];
+    let puntajeAuto = 0;
+    S.preguntas.forEach((q, i) => {
+      if (q.autoCalificable) {
+        const resp = S.respuestas[i];
+        puntajeAuto += calcPuntajeRetroEntrega(resp, q);
+      }
+    });
+
     await updateDoc(doc(db,'respuestas',S.examenId,'estudiantes',S.respDocId), {
-      entregado: true, fin: serverTimestamp(),
+      entregado: true,
+      fin: serverTimestamp(),
       entregadoForzado: forced,
+      puntajeTotal: parseFloat(puntajeAuto.toFixed(2)),
     });
   } catch(_) {}
   document.getElementById('finish-name').textContent = S.estudiante.nombre;
@@ -919,17 +937,82 @@ window.finishExam = async (forced=false) => {
   checkRetroDisponible();
 };
 
-async function checkRetroDisponible() {
-  try {
-    const snap = await getDoc(doc(db,'examenes',S.examenId));
-    if (snap.exists() && snap.data().retroAlimentacionVisible) {
-      document.getElementById('retro-btn-wrap').style.display = 'block';
-    } else {
-      document.getElementById('retro-pending-msg').style.display = 'block';
+// Calcula el puntaje automático al momento de entregar
+// (versión sin acceso al DOM, solo con los datos guardados en S.respuestas)
+function calcPuntajeRetroEntrega(resp, q) {
+  if (resp === undefined || resp === null || resp === '') return 0;
+  switch(q.tipo) {
+    case 'unica':
+      return resp === q.correcta ? q.puntaje : 0;
+    case 'multiple': {
+      if (!Array.isArray(resp)) return 0;
+      const correctas = q.correctas || [];
+      const todas = correctas.every(c => resp.includes(c));
+      const sinExtra = resp.every(t => correctas.includes(t));
+      return todas && sinExtra ? q.puntaje : 0;
     }
-  } catch(_) {
-    document.getElementById('retro-pending-msg').style.display = 'block';
+    case 'verdaderoFalso': {
+      let val = resp;
+      if (val === 0) val = false;
+      if (val === 1) val = true;
+      return val === q.correcta ? q.puntaje : 0;
+    }
+    case 'emparejar': {
+      let ok = 0;
+      (q.pares||[]).forEach((p,pi) => {
+        if (resp[pi]===p.derecha || resp[String(pi)]===p.derecha) ok++;
+      });
+      return parseFloat(((ok/(q.pares||[]).length)*q.puntaje).toFixed(2));
+    }
+    case 'ordenar': {
+      if (!Array.isArray(resp)) return 0;
+      let ok = 0;
+      (q.correctos||[]).forEach((v,i) => { if(resp[i]===v) ok++; });
+      return parseFloat(((ok/(q.correctos||[]).length)*q.puntaje).toFixed(2));
+    }
+    default: return 0;
   }
+}
+
+function checkRetroDisponible() {
+  // Escucha en tiempo real el examen Y las respuestas del estudiante.
+  // El botón de retroalimentación aparece si:
+  //   A) El profesor activó el toggle (retroAlimentacionVisible = true), O
+  //   B) Ya existe una calificación automática calculada (puntajeTotal definido)
+  // En ambos casos el estudiante puede ver su resultado inmediatamente.
+
+  const btnWrap    = document.getElementById('retro-btn-wrap');
+  const pendingMsg = document.getElementById('retro-pending-msg');
+
+  const mostrarBoton = () => {
+    if (btnWrap)    { btnWrap.style.display = 'block'; }
+    if (pendingMsg) { pendingMsg.style.display = 'none'; }
+  };
+  const mostrarPendiente = () => {
+    if (btnWrap)    { btnWrap.style.display = 'none'; }
+    if (pendingMsg) { pendingMsg.style.display = 'block'; }
+  };
+
+  let retroActiva   = false;
+  let tieneCalifAuto = false;
+
+  // Escuchar el examen (toggle del profesor)
+  onSnapshot(doc(db,'examenes',S.examenId), (snap) => {
+    retroActiva = snap.exists() && snap.data().retroAlimentacionVisible;
+    if (retroActiva || tieneCalifAuto) mostrarBoton();
+    else mostrarPendiente();
+  });
+
+  // Escuchar las respuestas del estudiante (calificación automática)
+  onSnapshot(doc(db,'respuestas',S.examenId,'estudiantes',S.respDocId), (snap) => {
+    if (snap.exists()) {
+      const data = snap.data();
+      // Tiene calificación automática si puntajeTotal está definido
+      tieneCalifAuto = data.puntajeTotal !== undefined && data.puntajeTotal !== null;
+      if (retroActiva || tieneCalifAuto) mostrarBoton();
+      else mostrarPendiente();
+    }
+  });
 }
 
 window.verRetroalimentacion = async () => {
