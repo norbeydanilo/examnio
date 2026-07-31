@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Examen</title>
+<style>
+  :root {
+    --bg:#0f1117; --surface:#1a1d27; --surface2:#22263a; --border:#2e3350;
+    --accent:#4f8ef7; --accent2:#7c5cbf; --success:#2ecc71;
+    --warning:#f39c12; --danger:#e74c3c;
+    --text:#e8eaf0; --text2:#8b90a8;
+    --code-bg:#0d1117; --radius:10px;
+    --font:'Segoe UI',system-ui,sans-serif;
+    --mono:'Cascadia Code','Fira Code','Consolas',monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:15px;line-height:1.6;min-height:100vh;}
+
+  /* STATUS */
+  #status-bar{position:fixed;top:0;left:0;right:0;height:36px;display:flex;align-items:center;justify-content:space-between;padding:0 20px;background:var(--surface);border-bottom:1px solid var(--border);font-size:12px;z-index:100;}
+  .status-dot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:6px;}
+  .online .status-dot{background:var(--success);} .offline .status-dot{background:var(--danger);}
+  .online{color:var(--success);} .offline{color:var(--danger);}
+
+  #warning-banner{display:none;position:fixed;top:36px;left:0;right:0;background:var(--danger);color:#fff;text-align:center;padding:10px;font-weight:600;z-index:99;animation:pulse 1s infinite alternate;}
+  @keyframes pulse{from{opacity:1;}to{opacity:.7;}}
+
+  /* PAGES */
+  .page{display:none;min-height:100vh;padding-top:36px;}
+  .page.active{display:flex;flex-direction:column;}
+  .center-wrap{display:flex;align-items:center;justify-content:center;flex:1;padding:40px 20px;}
+
+  /* LOGIN */
+  .login-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:40px;width:100%;max-width:420px;}
+  .login-card h1{font-size:22px;margin-bottom:6px;background:linear-gradient(90deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;}
+  .login-card p{color:var(--text2);font-size:13px;margin-bottom:28px;}
+  .field{margin-bottom:18px;}
+  .field label{display:block;font-size:12px;color:var(--text2);margin-bottom:6px;letter-spacing:.5px;text-transform:uppercase;}
+  .field input{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:var(--font);font-size:14px;padding:10px 14px;outline:none;transition:border .2s;}
+  .field input:focus{border-color:var(--accent);}
+  .btn{width:100%;background:var(--accent);border:none;border-radius:8px;color:#fff;cursor:pointer;font-family:var(--font);font-size:14px;font-weight:600;padding:12px;transition:opacity .2s;}
+  .btn:hover{opacity:.85;} .btn:disabled{opacity:.4;cursor:not-allowed;}
+  .btn.secondary{background:var(--surface2);border:1px solid var(--border);}
+  .error-msg{background:rgba(231,76,60,.15);border:1px solid var(--danger);border-radius:8px;color:var(--danger);font-size:13px;margin-top:14px;padding:10px 14px;display:none;}
+
+  /* EXAM — una pregunta por página */
+  #exam-wrap{max-width:760px;margin:0 auto;padding:30px 20px 100px;width:100%;}
+  #exam-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:28px;padding-bottom:16px;border-bottom:1px solid var(--border);}
+  #exam-header h2{font-size:18px;}
+
+  /* STEPPER */
+  #stepper{display:flex;align-items:center;gap:6px;margin-bottom:28px;overflow-x:auto;padding-bottom:4px;}
+  .step-dot{width:10px;height:10px;border-radius:50%;background:var(--border);flex-shrink:0;transition:background .2s;}
+  .step-dot.done{background:var(--accent2);}
+  .step-dot.current{background:var(--accent);box-shadow:0 0 0 3px rgba(79,142,247,.3);}
+
+  /* QUESTION CARD */
+  .question-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;}
+  .q-header{display:flex;align-items:center;gap:12px;padding:14px 18px;background:var(--surface2);border-bottom:1px solid var(--border);}
+  .q-num{background:var(--accent);color:#fff;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0;}
+  .q-type-tag{font-size:11px;padding:2px 8px;border-radius:10px;background:rgba(124,92,191,.2);color:var(--accent2);text-transform:uppercase;letter-spacing:.4px;}
+  .q-pts{margin-left:auto;font-size:12px;color:var(--text2);}
+  .q-body{padding:20px;}
+  .q-enunciado{font-size:15px;margin-bottom:16px;line-height:1.7;}
+
+  /* CODE */
+  .code-block{background:var(--code-bg);border:1px solid var(--border);border-radius:8px;padding:16px;margin-bottom:16px;overflow-x:auto;}
+  .code-block pre{font-family:var(--mono);font-size:13px;color:#c9d1d9;white-space:pre;}
+  .code-lang{font-size:11px;color:var(--text2);margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px;}
+  .q-image{border-radius:8px;max-width:100%;margin-bottom:16px;border:1px solid var(--border);}
+
+  /* OPTIONS */
+  .options-list{list-style:none;display:flex;flex-direction:column;gap:8px;}
+  .option-item{display:flex;align-items:flex-start;gap:12px;background:var(--surface2);border:2px solid var(--border);border-radius:8px;cursor:pointer;padding:12px 14px;transition:all .15s;user-select:none;}
+  .option-item:hover{border-color:var(--accent);background:rgba(79,142,247,.07);}
+  .option-item.selected{border-color:var(--accent);background:rgba(79,142,247,.13);}
+  .option-marker{width:22px;height:22px;flex-shrink:0;border:2px solid var(--border);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;transition:all .15s;margin-top:1px;}
+  .option-item.selected .option-marker{border-color:var(--accent);background:var(--accent);color:#fff;}
+  .option-multiple .option-marker{border-radius:4px;}
+  .option-text{font-size:14px;line-height:1.6;}
+
+  /* TF */
+  .tf-group{display:flex;gap:10px;}
+  .tf-btn{flex:1;padding:14px;border-radius:8px;border:2px solid var(--border);background:var(--surface2);color:var(--text);font-family:var(--font);font-size:15px;font-weight:600;cursor:pointer;transition:all .15s;}
+  .tf-btn:hover{border-color:var(--accent);}
+  .tf-btn.selected-true{border-color:var(--success);background:rgba(46,204,113,.15);color:var(--success);}
+  .tf-btn.selected-false{border-color:var(--danger);background:rgba(231,76,60,.15);color:var(--danger);}
+
+  /* COMPLETAR */
+  .completar-text{font-size:15px;line-height:2.4;}
+  .blank-input{background:var(--surface2);border:none;border-bottom:2px solid var(--accent);color:var(--text);font-family:var(--font);font-size:14px;outline:none;padding:2px 8px;text-align:center;width:150px;transition:border-color .2s;}
+  .blank-input:focus{border-color:var(--accent2);}
+
+  /* ABIERTO */
+  .open-textarea{background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:var(--font);font-size:14px;line-height:1.6;min-height:140px;outline:none;padding:12px 14px;resize:vertical;width:100%;transition:border-color .2s;}
+  .open-textarea:focus{border-color:var(--accent);}
+
+  /* EMPAREJAR */
+  .match-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;align-items:start;}
+  .match-left-item{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 14px;font-size:14px;display:flex;align-items:center;gap:8px;}
+  .match-label{background:var(--accent2);color:#fff;border-radius:4px;font-size:11px;font-weight:700;padding:2px 6px;flex-shrink:0;}
+  .match-select{background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:var(--font);font-size:13px;padding:10px 12px;width:100%;outline:none;transition:border-color .2s;}
+  .match-select:focus{border-color:var(--accent);}
+  .match-right-label{font-size:12px;color:var(--text2);margin-bottom:2px;}
+  .match-right-item{display:flex;flex-direction:column;}
+
+  /* ORDENAR */
+  .sort-list{display:flex;flex-direction:column;gap:8px;}
+  .sort-item{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:12px 14px;font-size:14px;display:flex;align-items:center;gap:10px;cursor:grab;user-select:none;}
+  .sort-item:active{cursor:grabbing;opacity:.7;}
+  .sort-item.drag-over{border-color:var(--accent);background:rgba(79,142,247,.1);}
+  .drag-handle{color:var(--text2);font-size:16px;}
+
+  /* NAV BOTTOM */
+  #nav-bottom{position:fixed;bottom:0;left:0;right:0;background:var(--surface);border-top:1px solid var(--border);padding:12px 20px;display:flex;align-items:center;gap:14px;z-index:90;}
+  #prog-bar-bg{flex:1;height:6px;background:var(--surface2);border-radius:3px;overflow:hidden;}
+  #prog-bar-fill{height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2));border-radius:3px;transition:width .4s;}
+  #prog-text{font-size:12px;color:var(--text2);white-space:nowrap;}
+  #btn-next{background:var(--accent);border:none;border-radius:8px;color:#fff;cursor:pointer;font-family:var(--font);font-size:14px;font-weight:600;padding:10px 28px;transition:opacity .2s;white-space:nowrap;}
+  #btn-next:hover{opacity:.85;}
+  #btn-next.finish{background:var(--success);}
+
+  /* LOCKED overlay — cuando ya respondió */
+  .locked-note{background:rgba(79,142,247,.08);border:1px solid rgba(79,142,247,.25);border-radius:8px;color:var(--text2);font-size:13px;margin-top:14px;padding:10px 14px;text-align:center;}
+
+  /* MODAL */
+  #modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:200;align-items:center;justify-content:center;}
+  #modal-overlay.visible{display:flex;}
+  .modal-box{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:32px;max-width:380px;width:90%;}
+  .modal-box h3{margin-bottom:12px;}
+  .modal-box p{color:var(--text2);font-size:14px;margin-bottom:22px;}
+  .modal-actions{display:flex;gap:10px;}
+  .modal-actions .btn{flex:1;}
+
+  /* FINISH */
+  .finish-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:50px 40px;text-align:center;max-width:480px;width:100%;}
+  .finish-icon{font-size:48px;margin-bottom:16px;}
+  .finish-card h2{font-size:22px;margin-bottom:10px;}
+  .finish-card p{color:var(--text2);margin-bottom:8px;}
+  .finish-score{font-size:42px;font-weight:700;color:var(--accent);margin:20px 0 8px;}
+  .finish-label{font-size:13px;color:var(--text2);}
+
+  .spinner{width:20px;height:20px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite;display:inline-block;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+
+  @media(max-width:600px){.match-grid{grid-template-columns:1fr;}.login-card{padding:28px 20px;}}
+</style>
+</head>
+<body>
+
+<div id="status-bar">
+  <span id="conn-status" class="online"><span class="status-dot"></span>Conectado</span>
+  <span id="student-name-top" style="font-size:12px;color:var(--accent)">—</span>
+  <span id="events-count" style="font-size:11px;color:var(--text2)">0 eventos</span>
+</div>
+<div id="warning-banner">⚠️ Has salido del examen — este evento fue registrado</div>
+
+<div id="modal-overlay">
+  <div class="modal-box">
+    <h3>¿Entregar examen?</h3>
+    <p>Esta es la última pregunta. Al confirmar, tu examen quedará entregado y no podrás hacer cambios.</p>
+    <div class="modal-actions">
+      <button class="btn secondary" onclick="closeModal()">Cancelar</button>
+      <button class="btn" onclick="finishExam()">Sí, entregar</button>
+    </div>
+  </div>
+</div>
+
+<!-- LOGIN -->
+<div id="page-login" class="page active">
+  <div class="center-wrap">
+    <div class="login-card">
+      <h1>Examen</h1>
+      <p>Ingresa tus datos para comenzar</p>
+      <div class="field"><label>Nombre completo</label><input type="text" id="inp-nombre" placeholder="Ana Torres" autocomplete="off"></div>
+      <div class="field"><label>Código estudiantil</label><input type="text" id="inp-codigo" placeholder="1001234567" autocomplete="off"></div>
+      <div class="field"><label>Código del examen</label><input type="text" id="inp-examen" placeholder="Proporcionado por el profesor" autocomplete="off" onkeydown="if(event.key==='Enter')doLogin()"></div>
+      <button class="btn" id="btn-login" onclick="doLogin()">Ingresar al examen</button>
+      <div class="error-msg" id="login-error"></div>
+    </div>
+  </div>
+</div>
+
+<!-- EXAM -->
+<div id="page-exam" class="page">
+  <div id="exam-wrap">
+    <div id="exam-header">
+      <div><h2 id="exam-title">Examen</h2><span id="exam-subtitle" style="font-size:13px;color:var(--text2)"></span></div>
+      <span id="student-name-label" style="font-size:12px;color:var(--accent);background:rgba(79,142,247,.1);padding:4px 12px;border-radius:20px;"></span>
+    </div>
+    <div id="stepper"></div>
+    <div id="question-area"></div>
+  </div>
+  <div id="nav-bottom">
+    <div id="prog-bar-bg"><div id="prog-bar-fill" style="width:0%"></div></div>
+    <span id="prog-text">1 / 0</span>
+    <button id="btn-next" onclick="handleNext()">Siguiente →</button>
+  </div>
+</div>
+
+<!-- FINISH -->
+<div id="page-finish" class="page">
+  <div class="center-wrap">
+    <div class="finish-card">
+      <div class="finish-icon">✅</div>
+      <h2>Examen entregado</h2>
+      <p id="finish-name"></p>
+      <p style="margin-top:8px;font-size:13px;color:var(--text2)">Tus respuestas fueron guardadas. Puedes cerrar esta ventana.</p>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import { initializeApp }           from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+import { getFirestore, doc, getDoc, setDoc, updateDoc,
+         arrayUnion, serverTimestamp,
+         enableIndexedDbPersistence } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+
+const firebaseConfig = {
+  apiKey:"AIzaSyBtdSxcbzXOOaX3zzQ6DC9fEV6Sx6P-9Jw",
+  authDomain:"examinador-7afb6.firebaseapp.com",
+  projectId:"examinador-7afb6",
+  storageBucket:"examinador-7afb6.firebasestorage.app",
+  messagingSenderId:"701854685959",
+  appId:"1:701854685959:web:6c54d2562e5b445f5d43a2"
+};
+const db = getFirestore(initializeApp(firebaseConfig));
+enableIndexedDbPersistence(db).catch(()=>{});
+
+// ── Estado ──
+let S = {
+  examenId:null, examenData:null, preguntas:[],
+  estudiante:null, respDocId:null,
+  respuestas:{},   // { idx: valor }  — inmutables una vez guardadas
+  eventos:[], currentIdx:0, entregado:false,
+};
+const LS = () => `ex_${S.examenId}_${S.respDocId}`;
+
+// ── Conexión ──
+const updateConn = () => {
+  const el = document.getElementById('conn-status');
+  el.className = navigator.onLine ? 'online' : 'offline';
+  el.innerHTML = navigator.onLine
+    ? '<span class="status-dot"></span>Conectado'
+    : '<span class="status-dot"></span>Sin conexión — guardado localmente';
+};
+window.addEventListener('online', updateConn);
+window.addEventListener('offline', updateConn);
+updateConn();
+
+// ── Páginas ──
+const showPage = id => {
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+};
+
+// ── LOGIN ──
+window.doLogin = async () => {
+  const nombre  = document.getElementById('inp-nombre').value.trim();
+  const codigo  = document.getElementById('inp-codigo').value.trim();
+  const exCod   = document.getElementById('inp-examen').value.trim().toUpperCase();
+  const errEl   = document.getElementById('login-error');
+  const btn     = document.getElementById('btn-login');
+  errEl.style.display = 'none';
+  if (!nombre||!codigo||!exCod){errEl.textContent='Completa todos los campos.';errEl.style.display='block';return;}
+  btn.disabled=true; btn.innerHTML='<span class="spinner"></span>';
+  try {
+    const snap = await getDoc(doc(db,'examenes',exCod));
+    if (!snap.exists()) throw new Error('Código de examen no válido.');
+    const exData = snap.data();
+    if (!exData.activo) throw new Error('Este examen no está activo aún.');
+    S.examenId   = exCod;
+    S.examenData = exData;
+    S.estudiante = { nombre, codigo };
+    S.respDocId  = `${codigo}-${nombre.replace(/\s+/g,'-').toLowerCase()}`;
+
+    // Restaurar desde localStorage
+    const saved = localStorage.getItem(LS());
+    if (saved) {
+      const p = JSON.parse(saved);
+      if (p.entregado){ showPage('page-finish'); document.getElementById('finish-name').textContent=nombre; return; }
+      S.respuestas  = p.respuestas  || {};
+      S.eventos     = p.eventos     || [];
+      S.currentIdx  = p.currentIdx  || 0;
+      S.preguntas   = p.preguntas   || [];
+    }
+
+    // Primera vez: aleatorizar preguntas y opciones
+    if (!S.preguntas.length) {
+      S.preguntas = shuffle([...exData.preguntas]).map(q => {
+        const sq = {...q};
+        if (q.opciones) sq.opciones = shuffle([...q.opciones]);
+        if (q.items)    sq.items    = shuffle([...q.items]);
+        return sq;
+      });
+    }
+
+    // Crear/actualizar doc en Firestore
+    const ref = doc(db,'respuestas',exCod,'estudiantes',S.respDocId);
+    await setDoc(ref,{nombre,codigo,inicio:serverTimestamp(),entregado:false,respuestas:S.respuestas,eventos:S.eventos},{merge:true});
+
+    setupEvents();
+    renderHeader();
+    renderQuestion(S.currentIdx);
+    showPage('page-exam');
+  } catch(e) {
+    errEl.textContent = e.message||'Error al conectar.';
+    errEl.style.display='block';
+    btn.disabled=false; btn.textContent='Ingresar al examen';
+  }
+};
+
+// ── Aleatorizar ──
+const shuffle = a => { for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a; };
+
+// ── Header ──
+function renderHeader() {
+  const ex = S.examenData;
+  document.getElementById('exam-title').textContent    = ex.titulo||'Examen';
+  document.getElementById('exam-subtitle').textContent = ex.subtitulo||'';
+  document.getElementById('student-name-label').textContent = S.estudiante.nombre;
+  document.getElementById('student-name-top').textContent   = S.estudiante.nombre;
+}
+
+// ── Stepper ──
+function renderStepper(currentIdx) {
+  const n   = S.preguntas.length;
+  const el  = document.getElementById('stepper');
+  el.innerHTML = S.preguntas.map((_,i) => {
+    const cls = i < currentIdx ? 'done' : i === currentIdx ? 'current' : '';
+    return `<div class="step-dot ${cls}" title="Pregunta ${i+1}"></div>`;
+  }).join('');
+}
+
+// ── Progreso ──
+function updateProgress(idx) {
+  const n   = S.preguntas.length;
+  const pct = n ? Math.round(((idx+1)/n)*100) : 0;
+  document.getElementById('prog-bar-fill').style.width = pct+'%';
+  document.getElementById('prog-text').textContent = `${idx+1} / ${n}`;
+  const btn = document.getElementById('btn-next');
+  if (idx === n-1) { btn.textContent='Entregar ✓'; btn.classList.add('finish'); }
+  else { btn.textContent='Siguiente →'; btn.classList.remove('finish'); }
+}
+
+// ── Render pregunta ──
+function renderQuestion(idx) {
+  const q   = S.preguntas[idx];
+  const answered = S.respuestas[idx] !== undefined;
+  renderStepper(idx);
+  updateProgress(idx);
+
+  const typeLabel = {
+    unica:'Selección única', multiple:'Selección múltiple',
+    verdaderoFalso:'Verdadero / Falso', completar:'Completar',
+    abierto:'Pregunta abierta', emparejar:'Emparejar', ordenar:'Ordenar',
+  }[q.tipo] || q.tipo;
+
+  const area = document.getElementById('question-area');
+  area.innerHTML = `
+    <div class="question-card">
+      <div class="q-header">
+        <div class="q-num">${idx+1}</div>
+        <span class="q-type-tag">${typeLabel}</span>
+        <span class="q-pts">${q.puntaje} pt${q.puntaje!==1?'s':''}</span>
+      </div>
+      <div class="q-body">
+        <div class="q-enunciado">${q.enunciado}</div>
+        ${q.imagen?`<img src="${q.imagen}" class="q-image" alt="imagen">`:''}
+        ${q.codigo?`<div class="code-block">${q.lenguaje?`<div class="code-lang">${q.lenguaje}</div>`:''}<pre>${esc(q.codigo)}</pre></div>`:''}
+        <div id="answer-ui">${renderAnswerUI(q,idx)}</div>
+        ${answered?`<div class="locked-note">🔒 Respuesta guardada — no se puede modificar</div>`:''}
+      </div>
+    </div>`;
+
+  // Si ya respondió, bloquear controles
+  if (answered) lockUI(q, idx);
+  else restorePartial(q, idx);
+}
+
+function esc(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+// ── Bloquear UI ──
+function lockUI(q, idx) {
+  // Mostrar la respuesta guardada visualmente
+  restoreAnswer(q, idx, S.respuestas[idx]);
+  // Deshabilitar todos los controles
+  document.querySelectorAll('#answer-ui input,#answer-ui select,#answer-ui textarea,#answer-ui button,#answer-ui li')
+    .forEach(el => {
+      el.style.pointerEvents = 'none';
+      el.style.opacity = '0.7';
+      if (el.tagName==='LI') el.style.cursor='default';
+    });
+}
+
+// ── Render UI por tipo ──
+function renderAnswerUI(q, idx) {
+  switch(q.tipo) {
+    case 'unica':
+      return `<ul class="options-list">${q.opciones.map((op,oi)=>`
+        <li class="option-item" id="opt-${idx}-${oi}" onclick="selOpt(${idx},${oi},false)">
+          <div class="option-marker">${String.fromCharCode(65+oi)}</div>
+          <span class="option-text">${op}</span>
+        </li>`).join('')}</ul>`;
+
+    case 'multiple':
+      return `<ul class="options-list">${q.opciones.map((op,oi)=>`
+        <li class="option-item option-multiple" id="opt-${idx}-${oi}" onclick="selOpt(${idx},${oi},true)">
+          <div class="option-marker">✓</div>
+          <span class="option-text">${op}</span>
+        </li>`).join('')}</ul>`;
+
+    case 'verdaderoFalso':
+      return `<div class="tf-group">
+        <button class="tf-btn" id="tf-${idx}-true"  onclick="selTF(${idx},true)">✔ Verdadero</button>
+        <button class="tf-btn" id="tf-${idx}-false" onclick="selTF(${idx},false)">✘ Falso</button>
+      </div>`;
+
+    case 'completar': {
+      let i=0, txt=q.enunciado.replace(/___/g,()=>`<input class="blank-input" id="blank-${idx}-${i++}" placeholder="...">`);
+      return `<div class="completar-text">${txt}</div>`;
+    }
+
+    case 'abierto':
+      return `<textarea class="open-textarea" id="open-${idx}" placeholder="Escribe tu respuesta aquí..."></textarea>`;
+
+    case 'emparejar': {
+      const der = shuffle(q.pares.map(p=>p.derecha));
+      return `<div class="match-grid">
+        <div>${q.pares.map((p,pi)=>`<div class="match-left-item" style="margin-bottom:10px"><span class="match-label">${String.fromCharCode(65+pi)}</span>${p.izquierda}</div>`).join('')}</div>
+        <div>${q.pares.map((_,pi)=>`<div class="match-right-item" style="margin-bottom:10px">
+          <div class="match-right-label">Para ${String.fromCharCode(65+pi)}</div>
+          <select class="match-select" id="match-${idx}-${pi}">
+            <option value="">— selecciona —</option>
+            ${der.map(d=>`<option value="${d}">${d}</option>`).join('')}
+          </select></div>`).join('')}</div>
+      </div>`;
+    }
+
+    case 'ordenar':
+      return `<ul class="sort-list" id="sort-${idx}">${q.items.map((item,ii)=>`
+        <li class="sort-item" draggable="true" data-pos="${ii}"
+          ondragstart="dStart(event)" ondragover="dOver(event)" ondrop="dDrop(event,${idx})">
+          <span class="drag-handle">⠿</span>${item}
+        </li>`).join('')}</ul>`;
+
+    default: return '<p style="color:var(--text2)">Tipo no soportado.</p>';
+  }
+}
+
+// ── Interacciones ──
+window.selOpt = (qIdx,opIdx,multi) => {
+  const items = document.querySelectorAll(`#answer-ui .option-item`);
+  if (multi) {
+    items[opIdx].classList.toggle('selected');
+    const sel=[]; items.forEach((it,i)=>{if(it.classList.contains('selected'))sel.push(i);});
+    stagingAnswer(qIdx, sel);
+  } else {
+    items.forEach(it=>it.classList.remove('selected'));
+    items[opIdx].classList.add('selected');
+    stagingAnswer(qIdx, opIdx);
+  }
+};
+
+window.selTF = (qIdx,val) => {
+  document.getElementById(`tf-${qIdx}-true`).className  = 'tf-btn'+(val?' selected-true':'');
+  document.getElementById(`tf-${qIdx}-false`).className = 'tf-btn'+(!val?' selected-false':'');
+  stagingAnswer(qIdx, val);
+};
+
+// staging: guarda temporalmente (no definitivo — se confirma al pulsar Siguiente)
+let staging = null;
+function stagingAnswer(qIdx, val) { staging = { qIdx, val }; }
+
+// ── Drag & drop ordenar ──
+let dragPos=null;
+window.dStart = e => { dragPos=parseInt(e.currentTarget.dataset.pos); };
+window.dOver  = e => { e.preventDefault(); document.querySelectorAll('.sort-item').forEach(i=>i.classList.remove('drag-over')); e.currentTarget.classList.add('drag-over'); };
+window.dDrop  = (e,qIdx) => {
+  e.preventDefault();
+  const target=parseInt(e.currentTarget.dataset.pos);
+  const list=document.getElementById(`sort-${qIdx}`);
+  const items=[...list.querySelectorAll('.sort-item')];
+  if(dragPos!==null&&dragPos!==target){
+    const src=items[dragPos],tgt=items[target];
+    if(dragPos<target) list.insertBefore(src,tgt.nextSibling); else list.insertBefore(src,tgt);
+  }
+  [...list.querySelectorAll('.sort-item')].forEach((it,i)=>{it.dataset.pos=i;it.classList.remove('drag-over');});
+  const order=[...list.querySelectorAll('.sort-item')].map(it=>it.textContent.trim().replace('⠿','').trim());
+  stagingAnswer(qIdx,order);
+};
+
+// ── Restaurar respuesta para mostrar ──
+function restoreAnswer(q, idx, val) {
+  switch(q.tipo) {
+    case 'unica': { const its=document.querySelectorAll('#answer-ui .option-item'); if(its[val])its[val].classList.add('selected'); break; }
+    case 'multiple': { const its=document.querySelectorAll('#answer-ui .option-item'); (val||[]).forEach(i=>{if(its[i])its[i].classList.add('selected');}); break; }
+    case 'verdaderoFalso': window.selTF(idx,val); break;
+    case 'completar': (val||[]).forEach((v,i)=>{const el=document.getElementById(`blank-${idx}-${i}`);if(el)el.value=v;}); break;
+    case 'abierto': { const el=document.getElementById(`open-${idx}`); if(el)el.value=val||''; break; }
+    case 'emparejar': Object.entries(val||{}).forEach(([pi,v])=>{const s=document.getElementById(`match-${idx}-${pi}`);if(s)s.value=v;}); break;
+  }
+}
+
+function restorePartial(q,idx) {
+  // Nada por defecto — no hay staging parcial entre páginas
+}
+
+// ── Siguiente / Entregar ──
+window.handleNext = async () => {
+  const idx = S.currentIdx;
+  const q   = S.preguntas[idx];
+  const isLast = idx === S.preguntas.length - 1;
+
+  // Recoger respuesta actual si no está ya guardada
+  if (S.respuestas[idx] === undefined) {
+    const val = collectAnswer(q, idx);
+    if (val === null) {
+      // Sin respuesta — preguntar si quiere continuar sin responder
+      if (!confirm('No has respondido esta pregunta. ¿Deseas continuar sin responderla?')) return;
+      S.respuestas[idx] = '';
+    } else {
+      S.respuestas[idx] = val;
+    }
+    await persistAnswer(idx, S.respuestas[idx]);
+  }
+
+  if (isLast) { openModal(); return; }
+
+  S.currentIdx++;
+  staging = null;
+  saveLocal();
+  renderQuestion(S.currentIdx);
+};
+
+// Recoger valor actual de los controles
+function collectAnswer(q, idx) {
+  switch(q.tipo) {
+    case 'unica': { const sel=[...document.querySelectorAll('#answer-ui .option-item')].findIndex(it=>it.classList.contains('selected')); return sel>=0?sel:null; }
+    case 'multiple': { const sel=[...document.querySelectorAll('#answer-ui .option-item')].reduce((acc,it,i)=>{if(it.classList.contains('selected'))acc.push(i);return acc;},[]);  return sel.length?sel:null; }
+    case 'verdaderoFalso': { const t=document.getElementById(`tf-${idx}-true`); return t&&t.classList.contains('selected-true')?true:document.getElementById(`tf-${idx}-false`)&&document.getElementById(`tf-${idx}-false`).classList.contains('selected-false')?false:null; }
+    case 'completar': { const vals=[]; let i=0; q.enunciado.replace(/___/g,()=>{const el=document.getElementById(`blank-${idx}-${i++}`);vals.push(el?el.value.trim():'');}); return vals.every(v=>v==='')?null:vals; }
+    case 'abierto': { const el=document.getElementById(`open-${idx}`); return el&&el.value.trim()?el.value.trim():null; }
+    case 'emparejar': { const r={}; let any=false; q.pares.forEach((_,pi)=>{const s=document.getElementById(`match-${idx}-${pi}`);if(s&&s.value){r[pi]=s.value;any=true;}}); return any?r:null; }
+    case 'ordenar': { const list=document.getElementById(`sort-${idx}`); if(!list)return null; const order=[...list.querySelectorAll('.sort-item')].map(it=>it.textContent.trim().replace('⠿','').trim()); return order; }
+    default: return null;
+  }
+}
+
+async function persistAnswer(idx, val) {
+  saveLocal();
+  try {
+    const ref = doc(db,'respuestas',S.examenId,'estudiantes',S.respDocId);
+    await updateDoc(ref,{[`respuestas.${idx}`]:val});
+  } catch(_){}
+}
+
+function saveLocal() {
+  localStorage.setItem(LS(), JSON.stringify({
+    respuestas:S.respuestas, eventos:S.eventos,
+    currentIdx:S.currentIdx, preguntas:S.preguntas,
+    entregado:S.entregado,
+  }));
+}
+
+// ── Modal / Entrega ──
+window.openModal  = () => document.getElementById('modal-overlay').classList.add('visible');
+window.closeModal = () => document.getElementById('modal-overlay').classList.remove('visible');
+
+window.finishExam = async () => {
+  closeModal();
+  S.entregado = true;
+  saveLocal();
+  try {
+    const ref = doc(db,'respuestas',S.examenId,'estudiantes',S.respDocId);
+    await updateDoc(ref,{entregado:true, fin:serverTimestamp()});
+  } catch(_){}
+  document.getElementById('finish-name').textContent = S.estudiante.nombre;
+  showPage('page-finish');
+};
+
+// ── Detección de eventos ──
+function setupEvents() {
+  document.addEventListener('visibilitychange',()=>{ if(document.hidden) logEvent('Cambio de pestaña'); });
+  window.addEventListener('blur',()=>{ if(!document.hidden) logEvent('Ventana perdió el foco'); });
+  document.addEventListener('contextmenu',e=>{ e.preventDefault(); logEvent('Clic derecho'); });
+  document.addEventListener('keydown',e=>{
+    if(e.key==='F12'||(e.ctrlKey&&e.shiftKey&&['I','J','C'].includes(e.key))){ e.preventDefault(); logEvent('Intento DevTools'); }
+    if(e.ctrlKey&&e.key==='u'){ e.preventDefault(); logEvent('Intento ver código fuente'); }
+  });
+}
+
+async function logEvent(tipo) {
+  if(S.entregado) return;
+  const ev = { tipo, pregunta:S.currentIdx+1, hora:new Date().toLocaleTimeString('es-CO'), ts:Date.now() };
+  S.eventos.push(ev);
+  saveLocal();
+  const b=document.getElementById('warning-banner');
+  b.style.display='block'; setTimeout(()=>{b.style.display='none';},3000);
+  document.getElementById('events-count').textContent=`${S.eventos.length} evento${S.eventos.length!==1?'s':''}`;
+  try {
+    const ref=doc(db,'respuestas',S.examenId,'estudiantes',S.respDocId);
+    await updateDoc(ref,{eventos:arrayUnion(ev)});
+  } catch(_){}
+}
+</script>
+</body>
+</html>
