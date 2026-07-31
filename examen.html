@@ -194,7 +194,46 @@
   .spinner{width:20px;height:20px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite;display:inline-block;}
   @keyframes spin{to{transform:rotate(360deg);}}
 
-  @media(max-width:600px){.match-grid{grid-template-columns:1fr;}.login-card{padding:28px 20px;}}
+  /* RETROALIMENTACIÓN */
+  #page-retro { padding-top:40px; }
+  .retro-wrap { max-width:760px; margin:0 auto; padding:24px 20px 60px; }
+  .retro-header { margin-bottom:28px; padding-bottom:16px; border-bottom:1px solid var(--border); }
+  .retro-header h2 { font-size:18px; margin-bottom:4px; }
+  .retro-header p  { font-size:13px; color:var(--text2); }
+  .retro-score { display:inline-flex; align-items:center; gap:10px; background:var(--surface2); border:1px solid var(--border); border-radius:10px; padding:12px 20px; margin-top:14px; }
+  .retro-score .nota { font-size:32px; font-weight:800; color:var(--accent); }
+  .retro-score .label { font-size:12px; color:var(--text2); }
+
+  .retro-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); margin-bottom:16px; overflow:hidden; }
+  .retro-card.correct  { border-color:var(--success); }
+  .retro-card.incorrect{ border-color:var(--danger);  }
+  .retro-card.partial  { border-color:var(--warning); }
+  .retro-card.manual   { border-color:var(--accent2); }
+
+  .retro-q-header { display:flex; align-items:center; gap:10px; padding:12px 18px; background:var(--surface2); border-bottom:1px solid var(--border); }
+  .retro-num { width:26px; height:26px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:700; flex-shrink:0; }
+  .correct  .retro-num { background:var(--success); color:#fff; }
+  .incorrect .retro-num{ background:var(--danger);  color:#fff; }
+  .partial  .retro-num { background:var(--warning);  color:#000; }
+  .manual   .retro-num { background:var(--accent2);  color:#fff; }
+  .retro-result-tag { font-size:11px; font-weight:700; padding:2px 8px; border-radius:10px; text-transform:uppercase; letter-spacing:.4px; }
+  .correct  .retro-result-tag { background:rgba(46,204,113,.2);  color:var(--success); }
+  .incorrect .retro-result-tag { background:rgba(231,76,60,.2);   color:var(--danger);  }
+  .partial  .retro-result-tag { background:rgba(243,156,18,.2);  color:var(--warning); }
+  .manual   .retro-result-tag { background:rgba(124,92,191,.2);  color:var(--accent2); }
+  .retro-pts { margin-left:auto; font-size:12px; color:var(--text2); }
+
+  .retro-body { padding:18px; }
+  .retro-enunciado { font-size:14px; margin-bottom:14px; line-height:1.7; }
+  .retro-row { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:12px; }
+  .retro-box { background:var(--surface2); border-radius:8px; padding:12px 14px; }
+  .retro-box-label { font-size:10px; text-transform:uppercase; letter-spacing:.5px; color:var(--text2); margin-bottom:6px; }
+  .retro-box-value { font-size:13px; line-height:1.5; }
+  .retro-box.your   { border-left:3px solid var(--accent); }
+  .retro-box.answer { border-left:3px solid var(--success); }
+  .retro-box.pending{ border-left:3px solid var(--accent2); }
+
+  @media(max-width:600px){.match-grid{grid-template-columns:1fr;}.login-card{padding:28px 20px;}.retro-row{grid-template-columns:1fr;}}
 </style>
 </head>
 <body>
@@ -309,8 +348,41 @@
       <div class="finish-icon">✅</div>
       <h2>Examen entregado</h2>
       <p id="finish-name"></p>
-      <p style="margin-top:8px;font-size:13px;color:var(--text2)">Tus respuestas fueron guardadas. Puedes cerrar esta ventana.</p>
+      <p style="margin-top:8px;font-size:13px;color:var(--text2)">Tus respuestas fueron guardadas.</p>
+      <div id="retro-btn-wrap" style="display:none;margin-top:24px;">
+        <button class="btn" onclick="verRetroalimentacion()" style="width:auto;padding:12px 28px;">
+          📋 Ver retroalimentación
+        </button>
+      </div>
+      <p id="retro-pending-msg" style="display:none;margin-top:16px;font-size:13px;color:var(--text2)">
+        La retroalimentación no está disponible aún. El profesor la habilitará cuando lo considere.
+      </p>
     </div>
+  </div>
+</div>
+
+<!-- PAGE: RETROALIMENTACIÓN -->
+<div id="page-retro" class="page">
+  <div class="retro-wrap">
+    <div class="retro-header">
+      <h2 id="retro-title">Retroalimentación</h2>
+      <p id="retro-subtitle"></p>
+      <div class="retro-score">
+        <div>
+          <div class="nota" id="retro-nota">—</div>
+          <div class="label">nota final</div>
+        </div>
+        <div style="width:1px;height:40px;background:var(--border)"></div>
+        <div>
+          <div style="font-size:18px;font-weight:700;color:var(--text)" id="retro-pts-total">—</div>
+          <div class="label">puntos obtenidos</div>
+        </div>
+        <div>
+          <span id="retro-aprueba" style="font-size:13px;font-weight:700;padding:4px 12px;border-radius:20px;"></span>
+        </div>
+      </div>
+    </div>
+    <div id="retro-preguntas"></div>
   </div>
 </div>
 
@@ -710,21 +782,54 @@ window.dDrop  = (e,qIdx) => {
 
 // ── RESTAURAR RESPUESTA ──
 function restoreAnswer(q, idx, val) {
+  const items = [...document.querySelectorAll('#answer-ui .option-item')];
   switch(q.tipo) {
-    case 'unica': { const its=document.querySelectorAll('#answer-ui .option-item'); if(its[val])its[val].classList.add('selected'); break; }
-    case 'multiple': { const its=document.querySelectorAll('#answer-ui .option-item'); (val||[]).forEach(i=>{if(its[i])its[i].classList.add('selected');}); break; }
-    case 'verdaderoFalso': window.selTF(idx,val); break;
-    case 'completar': (val||[]).forEach((v,i)=>{const el=document.getElementById(`blank-${idx}-${i}`);if(el)el.value=v;}); break;
-    case 'abierto': { const el=document.getElementById(`open-${idx}`);if(el)el.value=val||''; break; }
-    case 'emparejar': Object.entries(val||{}).forEach(([pi,v])=>{const s=document.getElementById(`match-${idx}-${pi}`);if(s)s.value=v;}); break;
+    case 'unica': {
+      // val es texto de la opción — buscar cuál item coincide
+      if (typeof val === 'string') {
+        const i = q.opciones.indexOf(val);
+        if (i >= 0 && items[i]) items[i].classList.add('selected');
+      } else if (typeof val === 'number' && items[val]) {
+        items[val].classList.add('selected');
+      }
+      break;
+    }
+    case 'multiple': {
+      // val es array de textos — marcar los que coincidan
+      (val||[]).forEach(v => {
+        if (typeof v === 'string') {
+          const i = q.opciones.indexOf(v);
+          if (i >= 0 && items[i]) items[i].classList.add('selected');
+        } else if (typeof v === 'number' && items[v]) {
+          items[v].classList.add('selected');
+        }
+      });
+      break;
+    }
+    case 'verdaderoFalso': window.selTF(idx, val); break;
+    case 'completar': (val||[]).forEach((v,i)=>{const el=document.getElementById('blank-'+idx+'-'+i);if(el)el.value=v;}); break;
+    case 'abierto': { const el=document.getElementById('open-'+idx);if(el)el.value=val||''; break; }
+    case 'emparejar': Object.entries(val||{}).forEach(([pi,v])=>{const s=document.getElementById('match-'+idx+'-'+pi);if(s)s.value=v;}); break;
   }
 }
 
 // ── RECOGER RESPUESTA ──
+// IMPORTANTE: guardamos el TEXTO de la opción, no el índice.
+// Así la calificación en profesor.html puede comparar sin importar el orden aleatorio.
 function collectAnswer(q, idx) {
   switch(q.tipo) {
-    case 'unica': { const i=[...document.querySelectorAll('#answer-ui .option-item')].findIndex(it=>it.classList.contains('selected')); return i>=0?i:null; }
-    case 'multiple': { const sel=[...document.querySelectorAll('#answer-ui .option-item')].reduce((a,it,i)=>{if(it.classList.contains('selected'))a.push(i);return a;},[]);  return sel.length?sel:null; }
+    case 'unica': {
+      const items = [...document.querySelectorAll('#answer-ui .option-item')];
+      const sel   = items.findIndex(it=>it.classList.contains('selected'));
+      if (sel < 0) return null;
+      // Guardar el texto de la opción (sin el prefijo de letra)
+      return q.opciones[sel];
+    }
+    case 'multiple': {
+      const items = [...document.querySelectorAll('#answer-ui .option-item')];
+      const sel   = items.reduce((a,it,i)=>{if(it.classList.contains('selected'))a.push(q.opciones[i]);return a;},[]);
+      return sel.length ? sel : null;
+    }
     case 'verdaderoFalso': {
       const t=document.getElementById(`tf-${idx}-true`);
       const f=document.getElementById(`tf-${idx}-false`);
@@ -734,7 +839,14 @@ function collectAnswer(q, idx) {
     }
     case 'completar': { const v=[]; let i=0; q.enunciado.replace(/___/g,()=>{const el=document.getElementById(`blank-${idx}-${i++}`);v.push(el?el.value.trim():'');}); return v.every(x=>x==='')?null:v; }
     case 'abierto': { const el=document.getElementById(`open-${idx}`); return el&&el.value.trim()?el.value.trim():null; }
-    case 'emparejar': { const r={}; let any=false; q.pares.forEach((_,pi)=>{const s=document.getElementById(`match-${idx}-${pi}`);if(s&&s.value){r[pi]=s.value;any=true;}}); return any?r:null; }
+    case 'emparejar': {
+      const r={}; let any=false;
+      q.pares.forEach((_,pi)=>{
+        const s=document.getElementById('match-'+idx+'-'+pi);
+        if(s&&s.value){r[pi]=s.value;any=true;}
+      });
+      return any?r:null;
+    }
     case 'ordenar': { const list=document.getElementById(`sort-${idx}`); if(!list)return null; return [...list.querySelectorAll('.sort-item')].map(it=>it.textContent.trim().replace('⠿','').trim()); }
     default: return null;
   }
@@ -799,7 +911,173 @@ window.finishExam = async (forced=false) => {
   } catch(_) {}
   document.getElementById('finish-name').textContent = S.estudiante.nombre;
   showPage('page-finish');
+  // Verificar si ya hay retroalimentación disponible
+  checkRetroDisponible();
 };
+
+async function checkRetroDisponible() {
+  try {
+    const snap = await getDoc(doc(db,'examenes',S.examenId));
+    if (snap.exists() && snap.data().retroAlimentacionVisible) {
+      document.getElementById('retro-btn-wrap').style.display = 'block';
+    } else {
+      document.getElementById('retro-pending-msg').style.display = 'block';
+    }
+  } catch(_) {
+    document.getElementById('retro-pending-msg').style.display = 'block';
+  }
+}
+
+window.verRetroalimentacion = async () => {
+  try {
+    // Cargar respuestas del estudiante desde Firebase
+    const respSnap = await getDoc(doc(db,'respuestas',S.examenId,'estudiantes',S.respDocId));
+    const exSnap   = await getDoc(doc(db,'examenes',S.examenId));
+    if (!respSnap.exists() || !exSnap.exists()) return;
+
+    const examen     = exSnap.data();
+    const estudiante = respSnap.data();
+    const preguntas  = examen.preguntas || [];
+    const respuestas = estudiante.respuestas || {};
+    const esc        = examen.escala || { notaMin:0, notaMax:5, notaApro:3 };
+    const ptsTotal   = preguntas.reduce((s,q)=>s+q.puntaje, 0);
+
+    document.getElementById('retro-title').textContent    = examen.titulo || 'Retroalimentación';
+    document.getElementById('retro-subtitle').textContent = S.estudiante.nombre;
+
+    // Nota
+    const nota = estudiante.calificacion;
+    const ptsObtenidos = estudiante.puntajeTotal;
+    if (nota !== null && nota !== undefined) {
+      document.getElementById('retro-nota').textContent = nota.toFixed(1);
+      const aprueba = nota >= esc.notaApro;
+      const apEl = document.getElementById('retro-aprueba');
+      apEl.textContent = aprueba ? '✓ Aprobado' : '✗ Reprobado';
+      apEl.style.background = aprueba ? 'rgba(46,204,113,.15)' : 'rgba(231,76,60,.15)';
+      apEl.style.color = aprueba ? 'var(--success)' : 'var(--danger)';
+    } else {
+      document.getElementById('retro-nota').textContent = 'Pendiente';
+    }
+    document.getElementById('retro-pts-total').textContent =
+      (ptsObtenidos !== undefined ? ptsObtenidos.toFixed(2) : '—') + ' / ' + ptsTotal;
+
+    // Renderizar preguntas
+    const container = document.getElementById('retro-preguntas');
+    container.innerHTML = preguntas.map((q, qi) => {
+      const resp    = respuestas[qi];
+      const puntos  = calcularPuntosRetro(resp, q);
+      const maxPts  = q.puntaje;
+      const esManual = !q.autoCalificable;
+
+      let cls, tag;
+      if (esManual) {
+        cls = 'manual'; tag = '✏ Revisión manual';
+      } else if (puntos === maxPts) {
+        cls = 'correct'; tag = '✓ Correcto';
+      } else if (puntos > 0) {
+        cls = 'partial'; tag = '~ Parcial';
+      } else {
+        cls = 'incorrect'; tag = '✗ Incorrecto';
+      }
+
+      const typeLabel = {
+        unica:'Única', multiple:'Múltiple', verdaderoFalso:'V/F',
+        completar:'Completar', abierto:'Abierta', emparejar:'Emparejar', ordenar:'Ordenar'
+      }[q.tipo] || q.tipo;
+
+      const tuRespuesta  = formatRespRetro(resp, q);
+      const respCorrecta = formatCorrectaRetro(q);
+
+      return '<div class="retro-card ' + cls + '">' +
+        '<div class="retro-q-header">' +
+          '<div class="retro-num">' + (qi+1) + '</div>' +
+          '<span style="font-size:12px;color:var(--text2)">' + typeLabel + '</span>' +
+          '<span class="retro-result-tag">' + tag + '</span>' +
+          '<span class="retro-pts">' + (esManual ? '?' : puntos.toFixed(2)) + ' / ' + maxPts + ' pts</span>' +
+        '</div>' +
+        '<div class="retro-body">' +
+          '<div class="retro-enunciado">' + q.enunciado + '</div>' +
+          (q.codigo ? '<div class="code-block"><pre>' + escHtml(q.codigo) + '</pre></div>' : '') +
+          '<div class="retro-row">' +
+            '<div class="retro-box your">' +
+              '<div class="retro-box-label">Tu respuesta</div>' +
+              '<div class="retro-box-value">' + (tuRespuesta || '<em style="color:var(--text2)">Sin respuesta</em>') + '</div>' +
+            '</div>' +
+            (esManual
+              ? '<div class="retro-box pending"><div class="retro-box-label">Calificación</div><div class="retro-box-value" style="color:var(--accent2)">El profesor revisará esta respuesta</div></div>'
+              : '<div class="retro-box answer"><div class="retro-box-label">Respuesta correcta</div><div class="retro-box-value">' + respCorrecta + '</div></div>'
+            ) +
+          '</div>' +
+        '</div>' +
+      '</div>';
+    }).join('');
+
+    showPage('page-retro');
+  } catch(e) {
+    alert('Error al cargar la retroalimentación: ' + e.message);
+  }
+};
+
+function calcularPuntosRetro(resp, q) {
+  if (resp === undefined || resp === null || resp === '') return 0;
+  switch(q.tipo) {
+    case 'unica': return resp === q.correcta ? q.puntaje : 0;
+    case 'multiple': {
+      if (!Array.isArray(resp)) return 0;
+      const correctas = q.correctas || [];
+      const todasCorr = correctas.every(c => resp.includes(c));
+      const sinExtra  = resp.every(t => correctas.includes(t));
+      return todasCorr && sinExtra ? q.puntaje : 0;
+    }
+    case 'verdaderoFalso': {
+      let val = resp;
+      if (val === 0) val = false;
+      if (val === 1) val = true;
+      return val === q.correcta ? q.puntaje : 0;
+    }
+    case 'emparejar': {
+      let ok = 0;
+      (q.pares||[]).forEach((p,pi) => { if(resp[pi]===p.derecha||resp[String(pi)]===p.derecha) ok++; });
+      return parseFloat(((ok/(q.pares||[]).length)*q.puntaje).toFixed(2));
+    }
+    case 'ordenar': {
+      if (!Array.isArray(resp)) return 0;
+      let ok = 0;
+      (q.correctos||[]).forEach((v,i)=>{ if(resp[i]===v) ok++; });
+      return parseFloat(((ok/(q.correctos||[]).length)*q.puntaje).toFixed(2));
+    }
+    default: return 0;
+  }
+}
+
+function formatRespRetro(resp, q) {
+  if (resp === undefined || resp === null || resp === '') return '';
+  if (typeof resp === 'boolean') return resp ? 'Verdadero' : 'Falso';
+  if (resp === 0 || resp === 1) return resp === 1 ? 'Verdadero' : 'Falso';
+  if (typeof resp === 'string') return resp;
+  if (Array.isArray(resp)) return resp.join(' / ');
+  if (typeof resp === 'object') {
+    return Object.entries(resp).map(([k,v]) =>
+      (q.pares && q.pares[parseInt(k)] ? q.pares[parseInt(k)].izquierda : k) + ' → ' + v
+    ).join('<br>');
+  }
+  return String(resp);
+}
+
+function formatCorrectaRetro(q) {
+  switch(q.tipo) {
+    case 'unica': return q.correcta || '—';
+    case 'multiple': return (q.correctas||[]).join('<br>');
+    case 'verdaderoFalso': return q.correcta ? 'Verdadero' : 'Falso';
+    case 'emparejar': return (q.pares||[]).map(p => p.izquierda + ' → ' + p.derecha).join('<br>');
+    case 'ordenar': return (q.correctos||[]).join(' → ');
+    default: return '—';
+  }
+}
+
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
 
 // ── DETECCIÓN DE EVENTOS ──
 function setupEvents() {

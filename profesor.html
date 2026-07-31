@@ -671,28 +671,57 @@ window.guardarNota = async (si) => {
 
 // ── CALIFICACIÓN AUTOMÁTICA ──
 function calcAuto(resp,preguntas){ return preguntas.reduce((s,q,qi)=>{ if(q.autoCalificable)s+=calcPregunta(resp[qi],q); return s; },0); }
-function calcPregunta(resp,q) {
-  if(resp===undefined||resp===null)return 0;
-  switch(q.tipo){
+function calcPregunta(resp, q) {
+  if (resp === undefined || resp === null || resp === '') return 0;
+
+  switch (q.tipo) {
+
     case 'unica': {
-      // resp es el índice de la opción seleccionada (ya aleatorizada)
-      // la opción seleccionada es q.opciones[resp]
-      // comparamos con q.correcta (el texto de la opción correcta)
-      if(typeof resp==='number') return q.opciones&&q.opciones[resp]===q.correcta?q.puntaje:0;
-      return resp===q.correcta?q.puntaje:0;
+      // resp es el TEXTO de la opción seleccionada
+      // comparamos directamente con q.correcta (también texto)
+      if (typeof resp === 'string') return resp === q.correcta ? q.puntaje : 0;
+      // Compatibilidad con respuestas antiguas guardadas como índice
+      if (typeof resp === 'number') return q.opciones && q.opciones[resp] === q.correcta ? q.puntaje : 0;
+      return 0;
     }
+
     case 'multiple': {
-      if(!Array.isArray(resp))return 0;
-      // resp es array de índices, q.correctas es array de textos
-      const correctasTexto=q.correctas||[];
-      const selTextos=(q.opciones||[]).filter((_,i)=>resp.includes(i));
-      const todasCorr=correctasTexto.every(c=>selTextos.includes(c));
-      const sinExtra=selTextos.every(t=>correctasTexto.includes(t));
-      return todasCorr&&sinExtra?q.puntaje:0;
+      if (!Array.isArray(resp)) return 0;
+      const correctas = q.correctas || [];
+      // resp puede ser array de textos (nuevo) o array de índices (legado)
+      const selTextos = typeof resp[0] === 'string'
+        ? resp
+        : (q.opciones || []).filter((_, i) => resp.includes(i));
+      const todasCorr = correctas.every(c => selTextos.includes(c));
+      const sinExtra  = selTextos.every(t => correctas.includes(t));
+      return todasCorr && sinExtra ? q.puntaje : 0;
     }
-    case 'verdaderoFalso': return resp===q.correcta?q.puntaje:0;
-    case 'emparejar': { let ok=0; q.pares.forEach((p,pi)=>{if(resp[pi]===p.derecha)ok++;}); return parseFloat(((ok/q.pares.length)*q.puntaje).toFixed(2)); }
-    case 'ordenar': { if(!Array.isArray(resp))return 0; let ok=0; q.correctos.forEach((val,i)=>{if(resp[i]===val)ok++;}); return parseFloat(((ok/q.correctos.length)*q.puntaje).toFixed(2)); }
+
+    case 'verdaderoFalso': {
+      // resp debe ser boolean true/false
+      // Compatibilidad: si llegó como 0/1 convertir
+      let val = resp;
+      if (val === 0) val = false;
+      if (val === 1) val = true;
+      return val === q.correcta ? q.puntaje : 0;
+    }
+
+    case 'emparejar': {
+      // resp es { "0": "texto derecha", "1": "texto derecha", ... }
+      let ok = 0;
+      q.pares.forEach((p, pi) => {
+        if (resp[pi] === p.derecha || resp[String(pi)] === p.derecha) ok++;
+      });
+      return parseFloat(((ok / q.pares.length) * q.puntaje).toFixed(2));
+    }
+
+    case 'ordenar': {
+      if (!Array.isArray(resp)) return 0;
+      let ok = 0;
+      (q.correctos || []).forEach((val, i) => { if (resp[i] === val) ok++; });
+      return parseFloat(((ok / q.correctos.length) * q.puntaje).toFixed(2));
+    }
+
     default: return 0;
   }
 }
