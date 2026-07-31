@@ -351,11 +351,14 @@
       <p style="margin-top:8px;font-size:13px;color:var(--text2)">Tus respuestas fueron guardadas.</p>
       <div id="retro-btn-wrap" style="display:none;margin-top:24px;">
         <button class="btn" onclick="verRetroalimentacion()" style="width:auto;padding:12px 28px;">
-          📋 Ver retroalimentación
+          📋 Ver mis resultados
         </button>
+        <p id="retro-btn-nota-msg" style="margin-top:10px;font-size:12px;color:var(--text2);display:none">
+          ℹ️ La nota final estará disponible cuando el profesor la publique.
+        </p>
       </div>
       <p id="retro-pending-msg" style="display:none;margin-top:16px;font-size:13px;color:var(--text2)">
-        La retroalimentación no está disponible aún. El profesor la habilitará cuando lo considere.
+        Tus respuestas fueron guardadas. Los resultados estarán disponibles pronto.
       </p>
     </div>
   </div>
@@ -984,33 +987,37 @@ function checkRetroDisponible() {
   const btnWrap    = document.getElementById('retro-btn-wrap');
   const pendingMsg = document.getElementById('retro-pending-msg');
 
-  const mostrarBoton = () => {
-    if (btnWrap)    { btnWrap.style.display = 'block'; }
-    if (pendingMsg) { pendingMsg.style.display = 'none'; }
-  };
-  const mostrarPendiente = () => {
-    if (btnWrap)    { btnWrap.style.display = 'none'; }
-    if (pendingMsg) { pendingMsg.style.display = 'block'; }
-  };
-
-  let retroActiva   = false;
+  let retroActiva    = false;
   let tieneCalifAuto = false;
+  let tieneNota      = false;
+
+  const actualizar = () => {
+    if (tieneCalifAuto || retroActiva) {
+      // Mostrar botón siempre que haya calificación automática
+      if (btnWrap)    { btnWrap.style.display = 'block'; }
+      if (pendingMsg) { pendingMsg.style.display = 'none'; }
+      // Mostrar aviso de nota pendiente si no hay nota final aún
+      const notaMsg = document.getElementById('retro-btn-nota-msg');
+      if (notaMsg) notaMsg.style.display = tieneNota ? 'none' : 'block';
+    } else {
+      if (btnWrap)    { btnWrap.style.display = 'none'; }
+      if (pendingMsg) { pendingMsg.style.display = 'block'; }
+    }
+  };
 
   // Escuchar el examen (toggle del profesor)
   onSnapshot(doc(db,'examenes',S.examenId), (snap) => {
     retroActiva = snap.exists() && snap.data().retroAlimentacionVisible;
-    if (retroActiva || tieneCalifAuto) mostrarBoton();
-    else mostrarPendiente();
+    actualizar();
   });
 
-  // Escuchar las respuestas del estudiante (calificación automática)
+  // Escuchar las respuestas — puntajeTotal y calificacion
   onSnapshot(doc(db,'respuestas',S.examenId,'estudiantes',S.respDocId), (snap) => {
     if (snap.exists()) {
-      const data = snap.data();
-      // Tiene calificación automática si puntajeTotal está definido
+      const data     = snap.data();
       tieneCalifAuto = data.puntajeTotal !== undefined && data.puntajeTotal !== null;
-      if (retroActiva || tieneCalifAuto) mostrarBoton();
-      else mostrarPendiente();
+      tieneNota      = data.calificacion !== undefined && data.calificacion !== null;
+      actualizar();
     }
   });
 }
@@ -1032,26 +1039,54 @@ window.verRetroalimentacion = async () => {
     document.getElementById('retro-title').textContent    = examen.titulo || 'Retroalimentación';
     document.getElementById('retro-subtitle').textContent = S.estudiante.nombre;
 
-    // Nota
-    const nota = estudiante.calificacion;
+    // Nota — solo mostrar si el profesor ya la publicó
+    const nota         = estudiante.calificacion;
     const ptsObtenidos = estudiante.puntajeTotal;
+    const retroVisible = examen.retroAlimentacionVisible;
+
+    const notaEl    = document.getElementById('retro-nota');
+    const apEl      = document.getElementById('retro-aprueba');
+    const ptsEl     = document.getElementById('retro-pts-total');
+
     if (nota !== null && nota !== undefined) {
-      document.getElementById('retro-nota').textContent = nota.toFixed(1);
+      notaEl.textContent = nota.toFixed(1);
       const aprueba = nota >= esc.notaApro;
-      const apEl = document.getElementById('retro-aprueba');
-      apEl.textContent = aprueba ? '✓ Aprobado' : '✗ Reprobado';
+      apEl.textContent   = aprueba ? '✓ Aprobado' : '✗ Reprobado';
       apEl.style.background = aprueba ? 'rgba(46,204,113,.15)' : 'rgba(231,76,60,.15)';
-      apEl.style.color = aprueba ? 'var(--success)' : 'var(--danger)';
+      apEl.style.color      = aprueba ? 'var(--success)' : 'var(--danger)';
+      ptsEl.textContent = (ptsObtenidos !== undefined ? ptsObtenidos.toFixed(2) : '—') + ' / ' + ptsTotal;
     } else {
-      document.getElementById('retro-nota').textContent = 'Pendiente';
+      // Sin nota final aún — mostrar puntaje auto parcial con aviso
+      notaEl.textContent = '—';
+      notaEl.style.fontSize = '18px';
+      notaEl.style.color = 'var(--text2)';
+      apEl.textContent = 'Nota pendiente de publicación';
+      apEl.style.background = 'rgba(139,144,168,.15)';
+      apEl.style.color = 'var(--text2)';
+      ptsEl.textContent = (ptsObtenidos !== undefined ? ptsObtenidos.toFixed(2) : '—') + ' / ' + ptsTotal + ' pts auto';
     }
-    document.getElementById('retro-pts-total').textContent =
-      (ptsObtenidos !== undefined ? ptsObtenidos.toFixed(2) : '—') + ' / ' + ptsTotal;
+
+    // Mapear respuestas usando ordenPreguntas (igual que en profesor.html)
+    // respuestas[i] corresponde a la pregunta en posición i del orden aleatorio del estudiante
+    const ordenPreguntas = estudiante.ordenPreguntas || [];
+    const porId = {};
+    preguntas.forEach(q => { porId[q.id] = q; });
+
+    // Construir mapa: [{pregunta, respuesta}] en el orden que vio el estudiante
+    let mapa;
+    if (ordenPreguntas.length) {
+      mapa = ordenPreguntas.map((id, i) => ({
+        pregunta:  porId[id] || null,
+        respuesta: respuestas[i],
+      })).filter(x => x.pregunta !== null);
+    } else {
+      // Sin ordenPreguntas: usar orden original del JSON (fallback)
+      mapa = preguntas.map((q, i) => ({ pregunta: q, respuesta: respuestas[i] }));
+    }
 
     // Renderizar preguntas
     const container = document.getElementById('retro-preguntas');
-    container.innerHTML = preguntas.map((q, qi) => {
-      const resp    = respuestas[qi];
+    container.innerHTML = mapa.map(({ pregunta: q, respuesta: resp }, qi) => {
       const puntos  = calcularPuntosRetro(resp, q);
       const maxPts  = q.puntaje;
       const esManual = !q.autoCalificable;
@@ -1102,6 +1137,7 @@ window.verRetroalimentacion = async () => {
     showPage('page-retro');
   } catch(e) {
     alert('Error al cargar la retroalimentación: ' + e.message);
+    console.error(e);
   }
 };
 
