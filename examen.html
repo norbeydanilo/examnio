@@ -539,6 +539,9 @@ window.doLogin = async () => {
     }
 
     // Crear/actualizar doc en Firebase
+    // Guardamos ordenPreguntas: array de IDs en el orden aleatorio que vio este estudiante
+    // El panel del profesor lo usa para mapear respuesta[i] → pregunta correcta
+    const ordenPreguntas = S.preguntas.map(q => q.id);
     await setDoc(ref, {
       nombre, codigo, passHash,
       inicio: serverTimestamp(),
@@ -546,6 +549,7 @@ window.doLogin = async () => {
       respuestas: S.respuestas,
       eventos: S.eventos,
       calificacion: null,
+      ordenPreguntas,
     }, { merge: true });
 
     // Guardar passHash en localStorage
