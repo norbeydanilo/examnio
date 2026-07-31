@@ -627,7 +627,7 @@ function renderCalificacion() {
         <td><div class="resp-preview" title="${fmtResp(resp)}">${fmtResp(resp)}</div></td>
         <td>${auto!==null?`<span class="auto-grade">${auto.toFixed(2)}/${q.puntaje}</span>`:'<span style="color:var(--text2);font-size:12px">—</span>'}</td>
         <td>${!q.autoCalificable
-          ?`<input class="grade-input" type="number" min="0" max="${q.puntaje}" step="0.25" id="man-${si}-${q.id}" value="${prevMan!==undefined?prevMan:''}" placeholder="0–${q.puntaje}">`
+          ?`<input class="grade-input" type="number" min="0" max="${q.puntaje}" step="0.25" id="man-${si}-${q.id}" value="${prevMan!==undefined?prevMan:''}" placeholder="0–${q.puntaje}" oninput="recalcularNota(${si})">`
           :'<span style="color:var(--text2);font-size:11px">auto</span>'}</td>
       </tr>`;
     }).join('');
@@ -652,11 +652,31 @@ function renderCalificacion() {
           <thead><tr><th>#</th><th>Tipo</th><th>Respuesta del estudiante</th><th>Puntos auto</th><th>Puntos manual</th></tr></thead>
           <tbody>${filas}</tbody>
         </table></div>
-        <div style="margin-top:16px;background:var(--surface2);border-radius:8px;padding:14px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
-          <span style="font-size:12px;color:var(--text2)">Nota final (${esc.notaMin}–${esc.notaMax}):</span>
-          <input class="grade-input" type="number" min="${esc.notaMin}" max="${esc.notaMax}" step="0.1"
-            id="nota-final-${si}" value="${s.calificacion!==null&&s.calificacion!==undefined?s.calificacion:''}" placeholder="${esc.notaMin}–${esc.notaMax}">
-          <span style="font-size:12px;color:var(--text2)">Calculada automáticamente: <strong style="color:var(--accent)">${notaAuto}</strong></span>
+        <div style="margin-top:16px;background:var(--surface2);border-radius:8px;padding:16px;">
+          <div style="display:flex;gap:24px;flex-wrap:wrap;margin-bottom:12px;">
+            <div>
+              <div style="font-size:10px;color:var(--text2);text-transform:uppercase;letter-spacing:.4px;margin-bottom:3px">Pts automáticos</div>
+              <div style="font-size:16px;font-weight:700;color:var(--success)" id="pts-auto-${si}">${autoScore.toFixed(2)}</div>
+            </div>
+            <div>
+              <div style="font-size:10px;color:var(--text2);text-transform:uppercase;letter-spacing:.4px;margin-bottom:3px">Pts manuales</div>
+              <div style="font-size:16px;font-weight:700;color:var(--accent2)" id="pts-manual-${si}">0.00</div>
+            </div>
+            <div>
+              <div style="font-size:10px;color:var(--text2);text-transform:uppercase;letter-spacing:.4px;margin-bottom:3px">Total / ${ptsTotal} pts</div>
+              <div style="font-size:16px;font-weight:700;color:var(--text)" id="pts-total-${si}">${autoScore.toFixed(2)}</div>
+            </div>
+            <div style="border-left:1px solid var(--border);padding-left:20px;">
+              <div style="font-size:10px;color:var(--text2);text-transform:uppercase;letter-spacing:.4px;margin-bottom:3px">Nota calculada (${esc.notaMin}–${esc.notaMax})</div>
+              <div style="font-size:22px;font-weight:800;color:var(--accent)" id="nota-calc-${si}">${notaAuto}</div>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+            <span style="font-size:12px;color:var(--text2)">Nota final (puedes ajustar):</span>
+            <input class="grade-input" type="number" min="${esc.notaMin}" max="${esc.notaMax}" step="0.1"
+              id="nota-final-${si}" value="${s.calificacion!==null&&s.calificacion!==undefined?s.calificacion:''}" placeholder="${esc.notaMin}–${esc.notaMax}">
+            <span style="font-size:11px;color:var(--text2)">Deja vacío para usar la calculada automáticamente</span>
+          </div>
         </div>
         ${(s.eventos||[]).length?`
           <hr>
@@ -701,7 +721,61 @@ window.guardarNota = async (si) => {
   });
   CAL.estudiantes[si].calificacion = notaFinal;
   CAL.estudiantes[si].calificacionManual = manual;
+
+  // Actualizar UI de resumen en el header de la card
+  const notaEl = document.getElementById(`nota-calc-${si}`);
+  if (notaEl) notaEl.textContent = notaFinal.toFixed(2);
+  const totalEl = document.getElementById(`pts-total-${si}`);
+  if (totalEl) totalEl.textContent = totalPts.toFixed(2);
+  const manEl = document.getElementById(`pts-manual-${si}`);
+  if (manEl) {
+    const manTotal = Object.values(manual).reduce((a,b)=>a+b,0);
+    manEl.textContent = manTotal.toFixed(2);
+  }
+  // Actualizar el campo de nota final con el valor guardado
+  const notaInput = document.getElementById(`nota-final-${si}`);
+  if (notaInput && notaInput.value === '') notaInput.value = notaFinal;
+
   toast(`Nota de ${s.nombre}: ${notaFinal}`);
+};
+
+// Recalcular nota en tiempo real cuando se cambia un campo manual
+window.recalcularNota = (si) => {
+  const {examen, estudiantes} = CAL;
+  const s        = estudiantes[si];
+  const preguntas = examen.preguntas || [];
+  const esc       = examen.escala || { notaMin:0, notaMax:5, notaApro:3 };
+  const ptsTotal  = preguntas.reduce((sum,q) => sum + q.puntaje, 0);
+  const mapa      = buildRespMap(s, preguntas);
+
+  // Recoger valores manuales actuales de los inputs
+  let autoScore = 0, manScore = 0;
+  mapa.forEach(({ pregunta: q, respuesta: r }) => {
+    if (!q) return;
+    if (q.autoCalificable) {
+      autoScore += calcPregunta(r, q);
+    } else {
+      const inp = document.getElementById(`man-${si}-${q.id}`);
+      if (inp && inp.value !== '') manScore += parseFloat(inp.value) || 0;
+    }
+  });
+
+  const totalPts = autoScore + manScore;
+  const notaCalc = calcNota(totalPts, ptsTotal, esc);
+
+  // Actualizar displays
+  const manEl   = document.getElementById(`pts-manual-${si}`);
+  const totalEl = document.getElementById(`pts-total-${si}`);
+  const notaEl  = document.getElementById(`nota-calc-${si}`);
+  if (manEl)   manEl.textContent   = manScore.toFixed(2);
+  if (totalEl) totalEl.textContent = totalPts.toFixed(2);
+  if (notaEl)  notaEl.textContent  = notaCalc;
+
+  // Actualizar nota final solo si el campo está vacío (no sobreescribir ajuste manual)
+  const notaInput = document.getElementById(`nota-final-${si}`);
+  if (notaInput && notaInput.value === '') {
+    notaInput.placeholder = notaCalc;
+  }
 };
 
 
