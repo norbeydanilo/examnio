@@ -6,58 +6,106 @@
 <title>Examen</title>
 <style>
   :root {
-    --bg:#0f1117; --surface:#1a1d27; --surface2:#22263a; --border:#2e3350;
-    --accent:#4f8ef7; --accent2:#7c5cbf; --success:#2ecc71;
-    --warning:#f39c12; --danger:#e74c3c;
-    --text:#e8eaf0; --text2:#8b90a8;
-    --code-bg:#0d1117; --radius:10px;
+    --bg:#0f1117;--surface:#1a1d27;--surface2:#22263a;--border:#2e3350;
+    --accent:#4f8ef7;--accent2:#7c5cbf;--success:#2ecc71;
+    --warning:#f39c12;--danger:#e74c3c;
+    --text:#e8eaf0;--text2:#8b90a8;
+    --code-bg:#0d1117;--radius:10px;
     --font:'Segoe UI',system-ui,sans-serif;
     --mono:'Cascadia Code','Fira Code','Consolas',monospace;
   }
   *{box-sizing:border-box;margin:0;padding:0;}
   body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:15px;line-height:1.6;min-height:100vh;}
 
-  /* STATUS */
-  #status-bar{position:fixed;top:0;left:0;right:0;height:36px;display:flex;align-items:center;justify-content:space-between;padding:0 20px;background:var(--surface);border-bottom:1px solid var(--border);font-size:12px;z-index:100;}
-  .status-dot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:6px;}
-  .online .status-dot{background:var(--success);} .offline .status-dot{background:var(--danger);}
-  .online{color:var(--success);} .offline{color:var(--danger);}
+  /* STATUS BAR */
+  #status-bar{position:fixed;top:0;left:0;right:0;height:40px;display:flex;align-items:center;justify-content:space-between;padding:0 16px;background:var(--surface);border-bottom:1px solid var(--border);font-size:12px;z-index:100;gap:12px;}
+  .status-dot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:5px;}
+  .online .status-dot{background:var(--success);}
+  .offline .status-dot{background:var(--danger);}
+  .online{color:var(--success);}
+  .offline{color:var(--danger);}
 
-  #warning-banner{display:none;position:fixed;top:36px;left:0;right:0;background:var(--danger);color:#fff;text-align:center;padding:10px;font-weight:600;z-index:99;animation:pulse 1s infinite alternate;}
-  @keyframes pulse{from{opacity:1;}to{opacity:.7;}}
+  /* TIMER */
+  #timer-display{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:4px 12px;font-size:14px;font-weight:700;font-family:var(--mono);letter-spacing:2px;min-width:80px;text-align:center;}
+  #timer-display.warning{border-color:var(--warning);color:var(--warning);animation:pulse 1s infinite alternate;}
+  #timer-display.danger{border-color:var(--danger);color:var(--danger);animation:pulse .5s infinite alternate;}
+  @keyframes pulse{from{opacity:1;}to{opacity:.6;}}
+
+  /* BANNERS */
+  #warning-banner{display:none;position:fixed;top:40px;left:0;right:0;background:var(--danger);color:#fff;text-align:center;padding:10px 16px;font-weight:600;z-index:99;}
+  #event-alert{display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:300;align-items:center;justify-content:center;}
+  #event-alert.visible{display:flex;}
+  .alert-box{background:var(--surface);border:2px solid var(--danger);border-radius:var(--radius);padding:32px;max-width:420px;width:90%;text-align:center;}
+  .alert-box .alert-icon{font-size:40px;margin-bottom:12px;}
+  .alert-box h3{color:var(--danger);font-size:18px;margin-bottom:10px;}
+  .alert-box p{color:var(--text2);font-size:14px;margin-bottom:20px;line-height:1.7;}
+  .alert-box button{background:var(--danger);border:none;border-radius:8px;color:#fff;cursor:pointer;font-family:var(--font);font-size:14px;font-weight:600;padding:10px 24px;}
+
+  /* WIDGET PERSISTENTE DE ALERTA */
+  #alert-widget{
+    display:none;
+    position:fixed;
+    bottom:72px;
+    right:16px;
+    z-index:150;
+    background:var(--surface);
+    border:2px solid var(--danger);
+    border-radius:12px;
+    padding:12px 16px;
+    max-width:220px;
+    box-shadow:0 4px 20px rgba(231,76,60,.3);
+    animation:widgetPulse 2s infinite;
+  }
+  #alert-widget.visible{display:block;}
+  @keyframes widgetPulse{
+    0%,100%{box-shadow:0 4px 20px rgba(231,76,60,.3);}
+    50%{box-shadow:0 4px 28px rgba(231,76,60,.6);}
+  }
+  .widget-header{display:flex;align-items:center;gap:8px;margin-bottom:6px;}
+  .widget-icon{font-size:18px;}
+  .widget-title{font-size:12px;font-weight:700;color:var(--danger);text-transform:uppercase;letter-spacing:.4px;}
+  .widget-count{
+    font-size:28px;font-weight:800;color:var(--danger);
+    text-align:center;line-height:1;margin-bottom:4px;
+  }
+  .widget-label{font-size:11px;color:var(--text2);text-align:center;line-height:1.4;}
+  .widget-bar{height:4px;background:var(--border);border-radius:2px;overflow:hidden;margin-top:10px;}
+  .widget-bar-fill{height:100%;background:var(--danger);border-radius:2px;transition:width .5s;}
 
   /* PAGES */
-  .page{display:none;min-height:100vh;padding-top:36px;}
+  .page{display:none;min-height:100vh;padding-top:40px;}
   .page.active{display:flex;flex-direction:column;}
   .center-wrap{display:flex;align-items:center;justify-content:center;flex:1;padding:40px 20px;}
 
   /* LOGIN */
-  .login-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:40px;width:100%;max-width:420px;}
+  .login-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:40px;width:100%;max-width:440px;}
   .login-card h1{font-size:22px;margin-bottom:6px;background:linear-gradient(90deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;}
-  .login-card p{color:var(--text2);font-size:13px;margin-bottom:28px;}
-  .field{margin-bottom:18px;}
-  .field label{display:block;font-size:12px;color:var(--text2);margin-bottom:6px;letter-spacing:.5px;text-transform:uppercase;}
+  .login-card p{color:var(--text2);font-size:13px;margin-bottom:24px;}
+  .field{margin-bottom:16px;}
+  .field label{display:block;font-size:11px;color:var(--text2);margin-bottom:5px;letter-spacing:.5px;text-transform:uppercase;}
   .field input{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:var(--font);font-size:14px;padding:10px 14px;outline:none;transition:border .2s;}
   .field input:focus{border-color:var(--accent);}
+  .field .hint{font-size:11px;color:var(--text2);margin-top:4px;}
   .btn{width:100%;background:var(--accent);border:none;border-radius:8px;color:#fff;cursor:pointer;font-family:var(--font);font-size:14px;font-weight:600;padding:12px;transition:opacity .2s;}
-  .btn:hover{opacity:.85;} .btn:disabled{opacity:.4;cursor:not-allowed;}
-  .btn.secondary{background:var(--surface2);border:1px solid var(--border);}
-  .error-msg{background:rgba(231,76,60,.15);border:1px solid var(--danger);border-radius:8px;color:var(--danger);font-size:13px;margin-top:14px;padding:10px 14px;display:none;}
+  .btn:hover{opacity:.85;}
+  .btn:disabled{opacity:.4;cursor:not-allowed;}
+  .error-msg{background:rgba(231,76,60,.15);border:1px solid var(--danger);border-radius:8px;color:var(--danger);font-size:13px;margin-top:12px;padding:10px 14px;display:none;}
 
-  /* EXAM — una pregunta por página */
-  #exam-wrap{max-width:760px;margin:0 auto;padding:30px 20px 100px;width:100%;}
-  #exam-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:28px;padding-bottom:16px;border-bottom:1px solid var(--border);}
-  #exam-header h2{font-size:18px;}
+  /* EXAM */
+  #exam-wrap{max-width:760px;margin:0 auto;padding:24px 20px 100px;width:100%;}
+  #exam-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:24px;padding-bottom:16px;border-bottom:1px solid var(--border);}
+  #exam-header h2{font-size:17px;}
+  #exam-header p{font-size:13px;color:var(--text2);margin-top:3px;}
 
   /* STEPPER */
-  #stepper{display:flex;align-items:center;gap:6px;margin-bottom:28px;overflow-x:auto;padding-bottom:4px;}
+  #stepper{display:flex;align-items:center;gap:5px;margin-bottom:24px;overflow-x:auto;padding-bottom:4px;}
   .step-dot{width:10px;height:10px;border-radius:50%;background:var(--border);flex-shrink:0;transition:background .2s;}
   .step-dot.done{background:var(--accent2);}
   .step-dot.current{background:var(--accent);box-shadow:0 0 0 3px rgba(79,142,247,.3);}
 
-  /* QUESTION CARD */
+  /* QUESTION */
   .question-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;}
-  .q-header{display:flex;align-items:center;gap:12px;padding:14px 18px;background:var(--surface2);border-bottom:1px solid var(--border);}
+  .q-header{display:flex;align-items:center;gap:10px;padding:13px 18px;background:var(--surface2);border-bottom:1px solid var(--border);}
   .q-num{background:var(--accent);color:#fff;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0;}
   .q-type-tag{font-size:11px;padding:2px 8px;border-radius:10px;background:rgba(124,92,191,.2);color:var(--accent2);text-transform:uppercase;letter-spacing:.4px;}
   .q-pts{margin-left:auto;font-size:12px;color:var(--text2);}
@@ -88,29 +136,29 @@
   .tf-btn.selected-false{border-color:var(--danger);background:rgba(231,76,60,.15);color:var(--danger);}
 
   /* COMPLETAR */
-  .completar-text{font-size:15px;line-height:2.4;}
-  .blank-input{background:var(--surface2);border:none;border-bottom:2px solid var(--accent);color:var(--text);font-family:var(--font);font-size:14px;outline:none;padding:2px 8px;text-align:center;width:150px;transition:border-color .2s;}
-  .blank-input:focus{border-color:var(--accent2);}
+  .completar-text{font-size:15px;line-height:2.6;}
+  .blank-input{background:var(--surface2);border:none;border-bottom:2px solid var(--accent);color:var(--text);font-family:var(--font);font-size:14px;outline:none;padding:2px 8px;text-align:center;width:150px;}
 
   /* ABIERTO */
   .open-textarea{background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:var(--font);font-size:14px;line-height:1.6;min-height:140px;outline:none;padding:12px 14px;resize:vertical;width:100%;transition:border-color .2s;}
   .open-textarea:focus{border-color:var(--accent);}
 
   /* EMPAREJAR */
-  .match-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;align-items:start;}
-  .match-left-item{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 14px;font-size:14px;display:flex;align-items:center;gap:8px;}
+  .match-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  .match-left-item{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 14px;font-size:14px;display:flex;align-items:center;gap:8px;margin-bottom:10px;}
   .match-label{background:var(--accent2);color:#fff;border-radius:4px;font-size:11px;font-weight:700;padding:2px 6px;flex-shrink:0;}
-  .match-select{background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:var(--font);font-size:13px;padding:10px 12px;width:100%;outline:none;transition:border-color .2s;}
-  .match-select:focus{border-color:var(--accent);}
+  .match-select{background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:var(--font);font-size:13px;padding:10px 12px;width:100%;outline:none;}
   .match-right-label{font-size:12px;color:var(--text2);margin-bottom:2px;}
-  .match-right-item{display:flex;flex-direction:column;}
+  .match-right-item{display:flex;flex-direction:column;margin-bottom:10px;}
 
   /* ORDENAR */
   .sort-list{display:flex;flex-direction:column;gap:8px;}
   .sort-item{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:12px 14px;font-size:14px;display:flex;align-items:center;gap:10px;cursor:grab;user-select:none;}
-  .sort-item:active{cursor:grabbing;opacity:.7;}
   .sort-item.drag-over{border-color:var(--accent);background:rgba(79,142,247,.1);}
   .drag-handle{color:var(--text2);font-size:16px;}
+
+  /* LOCKED */
+  .locked-note{background:rgba(79,142,247,.08);border:1px solid rgba(79,142,247,.2);border-radius:8px;color:var(--text2);font-size:13px;margin-top:14px;padding:10px 14px;text-align:center;}
 
   /* NAV BOTTOM */
   #nav-bottom{position:fixed;bottom:0;left:0;right:0;background:var(--surface);border-top:1px solid var(--border);padding:12px 20px;display:flex;align-items:center;gap:14px;z-index:90;}
@@ -121,11 +169,8 @@
   #btn-next:hover{opacity:.85;}
   #btn-next.finish{background:var(--success);}
 
-  /* LOCKED overlay — cuando ya respondió */
-  .locked-note{background:rgba(79,142,247,.08);border:1px solid rgba(79,142,247,.25);border-radius:8px;color:var(--text2);font-size:13px;margin-top:14px;padding:10px 14px;text-align:center;}
-
   /* MODAL */
-  #modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:200;align-items:center;justify-content:center;}
+  #modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:200;align-items:center;justify-content:center;}
   #modal-overlay.visible{display:flex;}
   .modal-box{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:32px;max-width:380px;width:90%;}
   .modal-box h3{margin-bottom:12px;}
@@ -133,13 +178,18 @@
   .modal-actions{display:flex;gap:10px;}
   .modal-actions .btn{flex:1;}
 
+  /* TIME UP MODAL */
+  #timeup-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.9);z-index:400;align-items:center;justify-content:center;}
+  #timeup-overlay.visible{display:flex;}
+  .timeup-box{background:var(--surface);border:2px solid var(--warning);border-radius:var(--radius);padding:40px;max-width:400px;width:90%;text-align:center;}
+  .timeup-box h2{color:var(--warning);font-size:22px;margin-bottom:12px;}
+  .timeup-box p{color:var(--text2);font-size:14px;margin-bottom:24px;}
+
   /* FINISH */
   .finish-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:50px 40px;text-align:center;max-width:480px;width:100%;}
   .finish-icon{font-size:48px;margin-bottom:16px;}
   .finish-card h2{font-size:22px;margin-bottom:10px;}
   .finish-card p{color:var(--text2);margin-bottom:8px;}
-  .finish-score{font-size:42px;font-weight:700;color:var(--accent);margin:20px 0 8px;}
-  .finish-label{font-size:13px;color:var(--text2);}
 
   .spinner{width:20px;height:20px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite;display:inline-block;}
   @keyframes spin{to{transform:rotate(360deg);}}
@@ -149,45 +199,98 @@
 </head>
 <body>
 
+<!-- STATUS BAR -->
 <div id="status-bar">
   <span id="conn-status" class="online"><span class="status-dot"></span>Conectado</span>
+  <span id="timer-display" style="display:none">--:--</span>
   <span id="student-name-top" style="font-size:12px;color:var(--accent)">—</span>
   <span id="events-count" style="font-size:11px;color:var(--text2)">0 eventos</span>
 </div>
-<div id="warning-banner">⚠️ Has salido del examen — este evento fue registrado</div>
 
+<!-- BANNERS -->
+<div id="warning-banner">⚠️ Actividad sospechosa detectada — evento registrado</div>
+
+<!-- WIDGET PERSISTENTE DE ALERTA -->
+<div id="alert-widget">
+  <div class="widget-header">
+    <span class="widget-icon">⚠️</span>
+    <span class="widget-title">En alerta</span>
+  </div>
+  <div class="widget-count" id="widget-count">0</div>
+  <div class="widget-label" id="widget-label">evento(s) registrado(s)<br>Tu examen está siendo monitoreado</div>
+  <div class="widget-bar"><div class="widget-bar-fill" id="widget-bar-fill" style="width:0%"></div></div>
+</div>
+
+<!-- ALERTA DE EVENTO -->
+<div id="event-alert">
+  <div class="alert-box">
+    <div class="alert-icon">⚠️</div>
+    <h3>Actividad sospechosa detectada</h3>
+    <p id="event-alert-msg">Se ha registrado un evento en tu examen. En una próxima ocurrencia tu examen será <strong>anulado y la nota quedará en cero</strong>. Mantén el foco en esta pestaña.</p>
+    <button onclick="closeEventAlert()">Entendido</button>
+  </div>
+</div>
+
+<!-- TIME UP -->
+<div id="timeup-overlay">
+  <div class="timeup-box">
+    <div style="font-size:48px;margin-bottom:12px">⏰</div>
+    <h2>Tiempo agotado</h2>
+    <p>El tiempo del examen ha terminado. Tu examen será enviado automáticamente con las respuestas que hayas registrado hasta este momento.</p>
+    <button class="btn" onclick="finishExam(true)" style="margin-top:8px">Enviar examen ahora</button>
+  </div>
+</div>
+
+<!-- MODAL CONFIRMACIÓN -->
 <div id="modal-overlay">
   <div class="modal-box">
     <h3>¿Entregar examen?</h3>
-    <p>Esta es la última pregunta. Al confirmar, tu examen quedará entregado y no podrás hacer cambios.</p>
+    <p>Al confirmar, tu examen quedará entregado y no podrás hacer cambios.</p>
     <div class="modal-actions">
-      <button class="btn secondary" onclick="closeModal()">Cancelar</button>
-      <button class="btn" onclick="finishExam()">Sí, entregar</button>
+      <button class="btn" style="background:var(--surface2);border:1px solid var(--border);color:var(--text)" onclick="closeModal()">Cancelar</button>
+      <button class="btn" onclick="finishExam(false)">Sí, entregar</button>
     </div>
   </div>
 </div>
 
-<!-- LOGIN -->
+<!-- PAGE: LOGIN -->
 <div id="page-login" class="page active">
   <div class="center-wrap">
     <div class="login-card">
       <h1>Examen</h1>
       <p>Ingresa tus datos para comenzar</p>
-      <div class="field"><label>Nombre completo</label><input type="text" id="inp-nombre" placeholder="Ana Torres" autocomplete="off"></div>
-      <div class="field"><label>Código estudiantil</label><input type="text" id="inp-codigo" placeholder="1001234567" autocomplete="off"></div>
-      <div class="field"><label>Código del examen</label><input type="text" id="inp-examen" placeholder="Proporcionado por el profesor" autocomplete="off" onkeydown="if(event.key==='Enter')doLogin()"></div>
+      <div class="field">
+        <label>Nombre completo</label>
+        <input type="text" id="inp-nombre" placeholder="Ana Torres" autocomplete="off">
+      </div>
+      <div class="field">
+        <label>Código estudiantil</label>
+        <input type="text" id="inp-codigo" placeholder="1001234567" autocomplete="off">
+      </div>
+      <div class="field">
+        <label>Código del examen</label>
+        <input type="text" id="inp-examen" placeholder="Proporcionado por el profesor" autocomplete="off">
+      </div>
+      <div class="field">
+        <label>Contraseña de sesión</label>
+        <input type="password" id="inp-pass" placeholder="Crea una contraseña o ingresa la que ya usaste" autocomplete="off" onkeydown="if(event.key==='Enter')doLogin()">
+        <div class="hint">Primera vez: elige una contraseña. Si recargas, usa la misma.</div>
+      </div>
       <button class="btn" id="btn-login" onclick="doLogin()">Ingresar al examen</button>
       <div class="error-msg" id="login-error"></div>
     </div>
   </div>
 </div>
 
-<!-- EXAM -->
+<!-- PAGE: EXAM -->
 <div id="page-exam" class="page">
   <div id="exam-wrap">
     <div id="exam-header">
-      <div><h2 id="exam-title">Examen</h2><span id="exam-subtitle" style="font-size:13px;color:var(--text2)"></span></div>
-      <span id="student-name-label" style="font-size:12px;color:var(--accent);background:rgba(79,142,247,.1);padding:4px 12px;border-radius:20px;"></span>
+      <div>
+        <h2 id="exam-title">Examen</h2>
+        <p id="exam-subtitle"></p>
+      </div>
+      <span id="student-name-label" style="font-size:12px;color:var(--accent);background:rgba(79,142,247,.1);padding:4px 12px;border-radius:20px;white-space:nowrap;"></span>
     </div>
     <div id="stepper"></div>
     <div id="question-area"></div>
@@ -199,7 +302,7 @@
   </div>
 </div>
 
-<!-- FINISH -->
+<!-- PAGE: FINISH -->
 <div id="page-finish" class="page">
   <div class="center-wrap">
     <div class="finish-card">
@@ -228,12 +331,23 @@ const firebaseConfig = {
 const db = getFirestore(initializeApp(firebaseConfig));
 enableIndexedDbPersistence(db).catch(()=>{});
 
+// ── Utilidades ──
+const shuffle = a => { for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a; };
+const esc = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+const showPage = id => { document.querySelectorAll('.page').forEach(p=>p.classList.remove('active')); document.getElementById(id).classList.add('active'); };
+
+// Hash simple (no criptográfico — suficiente para este caso)
+async function hashStr(str) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+
 // ── Estado ──
 let S = {
   examenId:null, examenData:null, preguntas:[],
   estudiante:null, respDocId:null,
-  respuestas:{},   // { idx: valor }  — inmutables una vez guardadas
-  eventos:[], currentIdx:0, entregado:false,
+  respuestas:{}, eventos:[], currentIdx:0, entregado:false,
+  timerInterval:null, secondsLeft:0, eventAlertCount:0,
 };
 const LS = () => `ex_${S.examenId}_${S.respDocId}`;
 
@@ -249,116 +363,214 @@ window.addEventListener('online', updateConn);
 window.addEventListener('offline', updateConn);
 updateConn();
 
-// ── Páginas ──
-const showPage = id => {
-  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
-  document.getElementById(id).classList.add('active');
-};
-
 // ── LOGIN ──
 window.doLogin = async () => {
   const nombre  = document.getElementById('inp-nombre').value.trim();
   const codigo  = document.getElementById('inp-codigo').value.trim();
   const exCod   = document.getElementById('inp-examen').value.trim().toUpperCase();
+  const pass    = document.getElementById('inp-pass').value;
   const errEl   = document.getElementById('login-error');
   const btn     = document.getElementById('btn-login');
+
   errEl.style.display = 'none';
-  if (!nombre||!codigo||!exCod){errEl.textContent='Completa todos los campos.';errEl.style.display='block';return;}
+  if (!nombre||!codigo||!exCod||!pass) {
+    errEl.textContent='Completa todos los campos incluyendo la contraseña de sesión.';
+    errEl.style.display='block'; return;
+  }
+  if (pass.length < 4) {
+    errEl.textContent='La contraseña debe tener al menos 4 caracteres.';
+    errEl.style.display='block'; return;
+  }
+
   btn.disabled=true; btn.innerHTML='<span class="spinner"></span>';
+
   try {
+    // Verificar examen
     const snap = await getDoc(doc(db,'examenes',exCod));
     if (!snap.exists()) throw new Error('Código de examen no válido.');
     const exData = snap.data();
-    if (!exData.activo) throw new Error('Este examen no está activo aún.');
+    if (!exData.activo) throw new Error('Este examen no está activo aún. Espera al profesor.');
+
     S.examenId   = exCod;
     S.examenData = exData;
     S.estudiante = { nombre, codigo };
     S.respDocId  = `${codigo}-${nombre.replace(/\s+/g,'-').toLowerCase()}`;
 
-    // Restaurar desde localStorage
+    const passHash = await hashStr(pass + S.respDocId);
+
+    // Verificar si ya existe un intento en Firebase
+    const ref = doc(db,'respuestas',exCod,'estudiantes',S.respDocId);
+    const existSnap = await getDoc(ref);
+
+    if (existSnap.exists()) {
+      const existing = existSnap.data();
+      // Verificar contraseña
+      if (existing.passHash && existing.passHash !== passHash) {
+        throw new Error('Contraseña incorrecta. Usa la contraseña con la que iniciaste este examen.');
+      }
+      if (existing.entregado) {
+        showPage('page-finish');
+        document.getElementById('finish-name').textContent = nombre;
+        return;
+      }
+      // Restaurar estado
+      S.respuestas = existing.respuestas || {};
+      S.eventos    = existing.eventos    || [];
+    }
+
+    // Restaurar desde localStorage también
     const saved = localStorage.getItem(LS());
     if (saved) {
       const p = JSON.parse(saved);
-      if (p.entregado){ showPage('page-finish'); document.getElementById('finish-name').textContent=nombre; return; }
-      S.respuestas  = p.respuestas  || {};
-      S.eventos     = p.eventos     || [];
-      S.currentIdx  = p.currentIdx  || 0;
-      S.preguntas   = p.preguntas   || [];
+      if (p.passHash && p.passHash !== passHash) {
+        throw new Error('Contraseña incorrecta para esta sesión guardada.');
+      }
+      if (p.entregado) { showPage('page-finish'); document.getElementById('finish-name').textContent=nombre; return; }
+      // Usar el estado más completo (más respuestas)
+      if (Object.keys(p.respuestas||{}).length > Object.keys(S.respuestas).length) {
+        S.respuestas = p.respuestas || {};
+      }
+      S.eventos    = p.eventos    || S.eventos;
+      S.currentIdx = p.currentIdx || 0;
+      S.preguntas  = p.preguntas  || [];
     }
 
-    // Primera vez: aleatorizar preguntas y opciones
+    // Primera vez: aleatorizar
     if (!S.preguntas.length) {
       S.preguntas = shuffle([...exData.preguntas]).map(q => {
         const sq = {...q};
-        if (q.opciones) sq.opciones = shuffle([...q.opciones]);
-        if (q.items)    sq.items    = shuffle([...q.items]);
+        // Aleatorizar opciones manteniendo letras originales como referencia interna
+        if (q.opciones) {
+          const indexed = q.opciones.map((op, i) => ({ op, origIdx: i }));
+          const shuffled = shuffle([...indexed]);
+          sq.opciones     = shuffled.map(x => x.op);
+          sq._opMap       = shuffled.map(x => x.origIdx); // mapeo nuevo→original
+        }
+        if (q.items) sq.items = shuffle([...q.items]);
         return sq;
       });
     }
 
-    // Crear/actualizar doc en Firestore
-    const ref = doc(db,'respuestas',exCod,'estudiantes',S.respDocId);
-    await setDoc(ref,{nombre,codigo,inicio:serverTimestamp(),entregado:false,respuestas:S.respuestas,eventos:S.eventos},{merge:true});
+    // Crear/actualizar doc en Firebase
+    await setDoc(ref, {
+      nombre, codigo, passHash,
+      inicio: serverTimestamp(),
+      entregado: false,
+      respuestas: S.respuestas,
+      eventos: S.eventos,
+      calificacion: null,
+    }, { merge: true });
 
+    // Guardar passHash en localStorage
+    S._passHash = passHash;
     setupEvents();
     renderHeader();
+    startTimer();
     renderQuestion(S.currentIdx);
+    // Restaurar widget si ya tenía eventos de una sesión anterior
+    if (S.eventos.length > 0) updateAlertWidget();
     showPage('page-exam');
+
+    document.getElementById('student-name-top').textContent   = nombre;
+    document.getElementById('student-name-label').textContent = nombre;
+
   } catch(e) {
-    errEl.textContent = e.message||'Error al conectar.';
+    errEl.textContent = e.message || 'Error al conectar. Intenta de nuevo.';
     errEl.style.display='block';
     btn.disabled=false; btn.textContent='Ingresar al examen';
   }
 };
 
-// ── Aleatorizar ──
-const shuffle = a => { for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a; };
+// ── TIMER ──
+function startTimer() {
+  const ex = S.examenData;
+  if (!ex.tiempoMinutos || ex.tiempoMinutos <= 0) return;
 
-// ── Header ──
+  // Calcular tiempo restante desde el inicio guardado
+  const saved = localStorage.getItem(LS());
+  let startTs  = Date.now();
+  if (saved) {
+    const p = JSON.parse(saved);
+    if (p.startTs) startTs = p.startTs;
+    else { saveLocal(); }
+  }
+
+  if (!JSON.parse(localStorage.getItem(LS()) || '{}').startTs) {
+    const current = JSON.parse(localStorage.getItem(LS()) || '{}');
+    current.startTs = Date.now();
+    localStorage.setItem(LS(), JSON.stringify(current));
+    startTs = current.startTs;
+  }
+
+  const totalMs   = ex.tiempoMinutos * 60 * 1000;
+  const elapsed   = Date.now() - startTs;
+  S.secondsLeft   = Math.max(0, Math.floor((totalMs - elapsed) / 1000));
+
+  const timerEl = document.getElementById('timer-display');
+  timerEl.style.display = 'block';
+
+  const tick = () => {
+    if (S.entregado) return;
+    const m = Math.floor(S.secondsLeft / 60);
+    const s = S.secondsLeft % 60;
+    timerEl.textContent = `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+
+    if (S.secondsLeft <= 60)       timerEl.className = 'danger';
+    else if (S.secondsLeft <= 300) timerEl.className = 'warning';
+    else                           timerEl.className = '';
+
+    if (S.secondsLeft <= 0) {
+      clearInterval(S.timerInterval);
+      document.getElementById('timeup-overlay').classList.add('visible');
+      // Auto-submit después de 10 segundos si no hace clic
+      setTimeout(() => finishExam(true), 10000);
+      return;
+    }
+    S.secondsLeft--;
+  };
+
+  tick();
+  S.timerInterval = setInterval(tick, 1000);
+}
+
+// ── HEADER ──
 function renderHeader() {
   const ex = S.examenData;
-  document.getElementById('exam-title').textContent    = ex.titulo||'Examen';
-  document.getElementById('exam-subtitle').textContent = ex.subtitulo||'';
-  document.getElementById('student-name-label').textContent = S.estudiante.nombre;
-  document.getElementById('student-name-top').textContent   = S.estudiante.nombre;
+  document.getElementById('exam-title').textContent    = ex.titulo  || 'Examen';
+  document.getElementById('exam-subtitle').textContent = ex.subtitulo || '';
 }
 
-// ── Stepper ──
-function renderStepper(currentIdx) {
-  const n   = S.preguntas.length;
-  const el  = document.getElementById('stepper');
-  el.innerHTML = S.preguntas.map((_,i) => {
-    const cls = i < currentIdx ? 'done' : i === currentIdx ? 'current' : '';
-    return `<div class="step-dot ${cls}" title="Pregunta ${i+1}"></div>`;
-  }).join('');
+// ── STEPPER ──
+function renderStepper(idx) {
+  document.getElementById('stepper').innerHTML = S.preguntas.map((_,i) =>
+    `<div class="step-dot ${i<idx?'done':i===idx?'current':''}" title="Pregunta ${i+1}"></div>`
+  ).join('');
 }
 
-// ── Progreso ──
+// ── PROGRESO ──
 function updateProgress(idx) {
-  const n   = S.preguntas.length;
-  const pct = n ? Math.round(((idx+1)/n)*100) : 0;
-  document.getElementById('prog-bar-fill').style.width = pct+'%';
+  const n = S.preguntas.length;
+  document.getElementById('prog-bar-fill').style.width = n ? Math.round(((idx+1)/n)*100)+'%' : '0%';
   document.getElementById('prog-text').textContent = `${idx+1} / ${n}`;
   const btn = document.getElementById('btn-next');
   if (idx === n-1) { btn.textContent='Entregar ✓'; btn.classList.add('finish'); }
   else { btn.textContent='Siguiente →'; btn.classList.remove('finish'); }
 }
 
-// ── Render pregunta ──
+// ── RENDER PREGUNTA ──
 function renderQuestion(idx) {
-  const q   = S.preguntas[idx];
+  const q        = S.preguntas[idx];
   const answered = S.respuestas[idx] !== undefined;
   renderStepper(idx);
   updateProgress(idx);
 
   const typeLabel = {
-    unica:'Selección única', multiple:'Selección múltiple',
-    verdaderoFalso:'Verdadero / Falso', completar:'Completar',
-    abierto:'Pregunta abierta', emparejar:'Emparejar', ordenar:'Ordenar',
+    unica:'Selección única',multiple:'Selección múltiple',
+    verdaderoFalso:'Verdadero / Falso',completar:'Completar',
+    abierto:'Pregunta abierta',emparejar:'Emparejar',ordenar:'Ordenar',
   }[q.tipo] || q.tipo;
 
-  const area = document.getElementById('question-area');
-  area.innerHTML = `
+  document.getElementById('question-area').innerHTML = `
     <div class="question-card">
       <div class="q-header">
         <div class="q-num">${idx+1}</div>
@@ -367,35 +579,19 @@ function renderQuestion(idx) {
       </div>
       <div class="q-body">
         <div class="q-enunciado">${q.enunciado}</div>
-        ${q.imagen?`<img src="${q.imagen}" class="q-image" alt="imagen">`:''}
+        ${q.imagen?`<img src="${q.imagen}" class="q-image" alt="imagen pregunta">`:''}
         ${q.codigo?`<div class="code-block">${q.lenguaje?`<div class="code-lang">${q.lenguaje}</div>`:''}<pre>${esc(q.codigo)}</pre></div>`:''}
         <div id="answer-ui">${renderAnswerUI(q,idx)}</div>
         ${answered?`<div class="locked-note">🔒 Respuesta guardada — no se puede modificar</div>`:''}
       </div>
     </div>`;
 
-  // Si ya respondió, bloquear controles
   if (answered) lockUI(q, idx);
-  else restorePartial(q, idx);
 }
 
-function esc(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
-
-// ── Bloquear UI ──
-function lockUI(q, idx) {
-  // Mostrar la respuesta guardada visualmente
-  restoreAnswer(q, idx, S.respuestas[idx]);
-  // Deshabilitar todos los controles
-  document.querySelectorAll('#answer-ui input,#answer-ui select,#answer-ui textarea,#answer-ui button,#answer-ui li')
-    .forEach(el => {
-      el.style.pointerEvents = 'none';
-      el.style.opacity = '0.7';
-      if (el.tagName==='LI') el.style.cursor='default';
-    });
-}
-
-// ── Render UI por tipo ──
+// ── RENDER UI POR TIPO ──
 function renderAnswerUI(q, idx) {
+  // Las letras A, B, C... se asignan según el orden ALEATORIO actual (no el original)
   switch(q.tipo) {
     case 'unica':
       return `<ul class="options-list">${q.opciones.map((op,oi)=>`
@@ -413,12 +609,14 @@ function renderAnswerUI(q, idx) {
 
     case 'verdaderoFalso':
       return `<div class="tf-group">
-        <button class="tf-btn" id="tf-${idx}-true"  onclick="selTF(${idx},true)">✔ Verdadero</button>
+        <button class="tf-btn" id="tf-${idx}-true" onclick="selTF(${idx},true)">✔ Verdadero</button>
         <button class="tf-btn" id="tf-${idx}-false" onclick="selTF(${idx},false)">✘ Falso</button>
       </div>`;
 
     case 'completar': {
-      let i=0, txt=q.enunciado.replace(/___/g,()=>`<input class="blank-input" id="blank-${idx}-${i++}" placeholder="...">`);
+      let i=0;
+      const txt = q.enunciado.replace(/___/g, () =>
+        `<input class="blank-input" id="blank-${idx}-${i++}" placeholder="...">`);
       return `<div class="completar-text">${txt}</div>`;
     }
 
@@ -428,8 +626,8 @@ function renderAnswerUI(q, idx) {
     case 'emparejar': {
       const der = shuffle(q.pares.map(p=>p.derecha));
       return `<div class="match-grid">
-        <div>${q.pares.map((p,pi)=>`<div class="match-left-item" style="margin-bottom:10px"><span class="match-label">${String.fromCharCode(65+pi)}</span>${p.izquierda}</div>`).join('')}</div>
-        <div>${q.pares.map((_,pi)=>`<div class="match-right-item" style="margin-bottom:10px">
+        <div>${q.pares.map((p,pi)=>`<div class="match-left-item"><span class="match-label">${String.fromCharCode(65+pi)}</span>${p.izquierda}</div>`).join('')}</div>
+        <div>${q.pares.map((_,pi)=>`<div class="match-right-item">
           <div class="match-right-label">Para ${String.fromCharCode(65+pi)}</div>
           <select class="match-select" id="match-${idx}-${pi}">
             <option value="">— selecciona —</option>
@@ -445,79 +643,90 @@ function renderAnswerUI(q, idx) {
           <span class="drag-handle">⠿</span>${item}
         </li>`).join('')}</ul>`;
 
-    default: return '<p style="color:var(--text2)">Tipo no soportado.</p>';
+    default:
+      return '<p style="color:var(--text2)">Tipo no soportado.</p>';
   }
 }
 
-// ── Interacciones ──
+// ── BLOQUEAR UI ──
+function lockUI(q, idx) {
+  restoreAnswer(q, idx, S.respuestas[idx]);
+  document.querySelectorAll('#answer-ui input,#answer-ui select,#answer-ui textarea,#answer-ui button,#answer-ui li')
+    .forEach(el => { el.style.pointerEvents='none'; el.style.opacity='.7'; if(el.tagName==='LI')el.style.cursor='default'; });
+}
+
+// ── INTERACCIONES ──
 window.selOpt = (qIdx,opIdx,multi) => {
-  const items = document.querySelectorAll(`#answer-ui .option-item`);
+  const items = document.querySelectorAll('#answer-ui .option-item');
   if (multi) {
     items[opIdx].classList.toggle('selected');
-    const sel=[]; items.forEach((it,i)=>{if(it.classList.contains('selected'))sel.push(i);});
-    stagingAnswer(qIdx, sel);
   } else {
     items.forEach(it=>it.classList.remove('selected'));
     items[opIdx].classList.add('selected');
-    stagingAnswer(qIdx, opIdx);
   }
 };
 
 window.selTF = (qIdx,val) => {
   document.getElementById(`tf-${qIdx}-true`).className  = 'tf-btn'+(val?' selected-true':'');
   document.getElementById(`tf-${qIdx}-false`).className = 'tf-btn'+(!val?' selected-false':'');
-  stagingAnswer(qIdx, val);
 };
 
-// staging: guarda temporalmente (no definitivo — se confirma al pulsar Siguiente)
-let staging = null;
-function stagingAnswer(qIdx, val) { staging = { qIdx, val }; }
-
-// ── Drag & drop ordenar ──
-let dragPos=null;
-window.dStart = e => { dragPos=parseInt(e.currentTarget.dataset.pos); };
+let dragPos = null;
+window.dStart = e => { dragPos = parseInt(e.currentTarget.dataset.pos); };
 window.dOver  = e => { e.preventDefault(); document.querySelectorAll('.sort-item').forEach(i=>i.classList.remove('drag-over')); e.currentTarget.classList.add('drag-over'); };
 window.dDrop  = (e,qIdx) => {
   e.preventDefault();
-  const target=parseInt(e.currentTarget.dataset.pos);
-  const list=document.getElementById(`sort-${qIdx}`);
-  const items=[...list.querySelectorAll('.sort-item')];
-  if(dragPos!==null&&dragPos!==target){
-    const src=items[dragPos],tgt=items[target];
-    if(dragPos<target) list.insertBefore(src,tgt.nextSibling); else list.insertBefore(src,tgt);
+  const target = parseInt(e.currentTarget.dataset.pos);
+  const list   = document.getElementById(`sort-${qIdx}`);
+  const items  = [...list.querySelectorAll('.sort-item')];
+  if (dragPos !== null && dragPos !== target) {
+    if (dragPos<target) list.insertBefore(items[dragPos],items[target].nextSibling);
+    else                list.insertBefore(items[dragPos],items[target]);
   }
   [...list.querySelectorAll('.sort-item')].forEach((it,i)=>{it.dataset.pos=i;it.classList.remove('drag-over');});
-  const order=[...list.querySelectorAll('.sort-item')].map(it=>it.textContent.trim().replace('⠿','').trim());
-  stagingAnswer(qIdx,order);
 };
 
-// ── Restaurar respuesta para mostrar ──
+// ── RESTAURAR RESPUESTA ──
 function restoreAnswer(q, idx, val) {
   switch(q.tipo) {
     case 'unica': { const its=document.querySelectorAll('#answer-ui .option-item'); if(its[val])its[val].classList.add('selected'); break; }
     case 'multiple': { const its=document.querySelectorAll('#answer-ui .option-item'); (val||[]).forEach(i=>{if(its[i])its[i].classList.add('selected');}); break; }
     case 'verdaderoFalso': window.selTF(idx,val); break;
     case 'completar': (val||[]).forEach((v,i)=>{const el=document.getElementById(`blank-${idx}-${i}`);if(el)el.value=v;}); break;
-    case 'abierto': { const el=document.getElementById(`open-${idx}`); if(el)el.value=val||''; break; }
+    case 'abierto': { const el=document.getElementById(`open-${idx}`);if(el)el.value=val||''; break; }
     case 'emparejar': Object.entries(val||{}).forEach(([pi,v])=>{const s=document.getElementById(`match-${idx}-${pi}`);if(s)s.value=v;}); break;
   }
 }
 
-function restorePartial(q,idx) {
-  // Nada por defecto — no hay staging parcial entre páginas
+// ── RECOGER RESPUESTA ──
+function collectAnswer(q, idx) {
+  switch(q.tipo) {
+    case 'unica': { const i=[...document.querySelectorAll('#answer-ui .option-item')].findIndex(it=>it.classList.contains('selected')); return i>=0?i:null; }
+    case 'multiple': { const sel=[...document.querySelectorAll('#answer-ui .option-item')].reduce((a,it,i)=>{if(it.classList.contains('selected'))a.push(i);return a;},[]);  return sel.length?sel:null; }
+    case 'verdaderoFalso': {
+      const t=document.getElementById(`tf-${idx}-true`);
+      const f=document.getElementById(`tf-${idx}-false`);
+      if(t&&t.classList.contains('selected-true')) return true;
+      if(f&&f.classList.contains('selected-false')) return false;
+      return null;
+    }
+    case 'completar': { const v=[]; let i=0; q.enunciado.replace(/___/g,()=>{const el=document.getElementById(`blank-${idx}-${i++}`);v.push(el?el.value.trim():'');}); return v.every(x=>x==='')?null:v; }
+    case 'abierto': { const el=document.getElementById(`open-${idx}`); return el&&el.value.trim()?el.value.trim():null; }
+    case 'emparejar': { const r={}; let any=false; q.pares.forEach((_,pi)=>{const s=document.getElementById(`match-${idx}-${pi}`);if(s&&s.value){r[pi]=s.value;any=true;}}); return any?r:null; }
+    case 'ordenar': { const list=document.getElementById(`sort-${idx}`); if(!list)return null; return [...list.querySelectorAll('.sort-item')].map(it=>it.textContent.trim().replace('⠿','').trim()); }
+    default: return null;
+  }
 }
 
-// ── Siguiente / Entregar ──
+// ── SIGUIENTE / ENTREGAR ──
 window.handleNext = async () => {
-  const idx = S.currentIdx;
-  const q   = S.preguntas[idx];
+  const idx    = S.currentIdx;
+  const q      = S.preguntas[idx];
   const isLast = idx === S.preguntas.length - 1;
 
-  // Recoger respuesta actual si no está ya guardada
   if (S.respuestas[idx] === undefined) {
     const val = collectAnswer(q, idx);
     if (val === null) {
-      // Sin respuesta — preguntar si quiere continuar sin responder
       if (!confirm('No has respondido esta pregunta. ¿Deseas continuar sin responderla?')) return;
       S.respuestas[idx] = '';
     } else {
@@ -527,83 +736,150 @@ window.handleNext = async () => {
   }
 
   if (isLast) { openModal(); return; }
-
   S.currentIdx++;
-  staging = null;
   saveLocal();
   renderQuestion(S.currentIdx);
 };
 
-// Recoger valor actual de los controles
-function collectAnswer(q, idx) {
-  switch(q.tipo) {
-    case 'unica': { const sel=[...document.querySelectorAll('#answer-ui .option-item')].findIndex(it=>it.classList.contains('selected')); return sel>=0?sel:null; }
-    case 'multiple': { const sel=[...document.querySelectorAll('#answer-ui .option-item')].reduce((acc,it,i)=>{if(it.classList.contains('selected'))acc.push(i);return acc;},[]);  return sel.length?sel:null; }
-    case 'verdaderoFalso': { const t=document.getElementById(`tf-${idx}-true`); return t&&t.classList.contains('selected-true')?true:document.getElementById(`tf-${idx}-false`)&&document.getElementById(`tf-${idx}-false`).classList.contains('selected-false')?false:null; }
-    case 'completar': { const vals=[]; let i=0; q.enunciado.replace(/___/g,()=>{const el=document.getElementById(`blank-${idx}-${i++}`);vals.push(el?el.value.trim():'');}); return vals.every(v=>v==='')?null:vals; }
-    case 'abierto': { const el=document.getElementById(`open-${idx}`); return el&&el.value.trim()?el.value.trim():null; }
-    case 'emparejar': { const r={}; let any=false; q.pares.forEach((_,pi)=>{const s=document.getElementById(`match-${idx}-${pi}`);if(s&&s.value){r[pi]=s.value;any=true;}}); return any?r:null; }
-    case 'ordenar': { const list=document.getElementById(`sort-${idx}`); if(!list)return null; const order=[...list.querySelectorAll('.sort-item')].map(it=>it.textContent.trim().replace('⠿','').trim()); return order; }
-    default: return null;
-  }
-}
-
 async function persistAnswer(idx, val) {
   saveLocal();
   try {
-    const ref = doc(db,'respuestas',S.examenId,'estudiantes',S.respDocId);
-    await updateDoc(ref,{[`respuestas.${idx}`]:val});
-  } catch(_){}
+    await updateDoc(doc(db,'respuestas',S.examenId,'estudiantes',S.respDocId), {[`respuestas.${idx}`]:val});
+  } catch(_) {}
 }
 
 function saveLocal() {
+  const existing = JSON.parse(localStorage.getItem(LS()) || '{}');
   localStorage.setItem(LS(), JSON.stringify({
-    respuestas:S.respuestas, eventos:S.eventos,
-    currentIdx:S.currentIdx, preguntas:S.preguntas,
-    entregado:S.entregado,
+    ...existing,
+    respuestas: S.respuestas, eventos: S.eventos,
+    currentIdx: S.currentIdx, preguntas: S.preguntas,
+    entregado:  S.entregado,  passHash: S._passHash,
   }));
 }
 
-// ── Modal / Entrega ──
+// ── MODAL / ENTREGA ──
 window.openModal  = () => document.getElementById('modal-overlay').classList.add('visible');
 window.closeModal = () => document.getElementById('modal-overlay').classList.remove('visible');
 
-window.finishExam = async () => {
+window.finishExam = async (forced=false) => {
   closeModal();
+  document.getElementById('timeup-overlay').classList.remove('visible');
+  if (S.entregado) return;
   S.entregado = true;
+  if (S.timerInterval) clearInterval(S.timerInterval);
   saveLocal();
   try {
-    const ref = doc(db,'respuestas',S.examenId,'estudiantes',S.respDocId);
-    await updateDoc(ref,{entregado:true, fin:serverTimestamp()});
-  } catch(_){}
+    await updateDoc(doc(db,'respuestas',S.examenId,'estudiantes',S.respDocId), {
+      entregado: true, fin: serverTimestamp(),
+      entregadoForzado: forced,
+    });
+  } catch(_) {}
   document.getElementById('finish-name').textContent = S.estudiante.nombre;
   showPage('page-finish');
 };
 
-// ── Detección de eventos ──
+// ── DETECCIÓN DE EVENTOS ──
 function setupEvents() {
-  document.addEventListener('visibilitychange',()=>{ if(document.hidden) logEvent('Cambio de pestaña'); });
-  window.addEventListener('blur',()=>{ if(!document.hidden) logEvent('Ventana perdió el foco'); });
-  document.addEventListener('contextmenu',e=>{ e.preventDefault(); logEvent('Clic derecho'); });
-  document.addEventListener('keydown',e=>{
-    if(e.key==='F12'||(e.ctrlKey&&e.shiftKey&&['I','J','C'].includes(e.key))){ e.preventDefault(); logEvent('Intento DevTools'); }
-    if(e.ctrlKey&&e.key==='u'){ e.preventDefault(); logEvent('Intento ver código fuente'); }
+  // Pestaña oculta
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) logEvent('Cambio de pestaña o pantalla oculta');
   });
+  // Pérdida de foco
+  window.addEventListener('blur', () => {
+    if (!document.hidden) logEvent('Ventana perdió el foco (alt+tab u otra app)');
+  });
+  // Clic derecho
+  document.addEventListener('contextmenu', e => { e.preventDefault(); logEvent('Clic derecho'); });
+  // Copiar
+  document.addEventListener('copy', () => logEvent('Intento de copiar texto (Ctrl+C)'));
+  // Cortar
+  document.addEventListener('cut', () => logEvent('Intento de cortar texto (Ctrl+X)'));
+  // Pegar
+  document.addEventListener('paste', () => logEvent('Intento de pegar texto (Ctrl+V)'));
+  // Teclas sospechosas
+  document.addEventListener('keydown', e => {
+    if (e.key==='F12'||(e.ctrlKey&&e.shiftKey&&['I','J','C'].includes(e.key))) {
+      e.preventDefault(); logEvent('Intento de abrir herramientas de desarrollador');
+    }
+    if (e.ctrlKey&&e.key==='u') { e.preventDefault(); logEvent('Intento de ver código fuente'); }
+    if (e.ctrlKey&&e.key==='p') { e.preventDefault(); logEvent('Intento de imprimir / guardar PDF'); }
+    if (e.key==='PrintScreen')  { logEvent('Captura de pantalla (PrintScreen)'); }
+    if (e.ctrlKey&&e.shiftKey&&e.key==='S') { e.preventDefault(); logEvent('Intento de guardar página'); }
+  });
+  // Selección de texto
+  let selTimer;
+  document.addEventListener('selectionchange', () => {
+    clearTimeout(selTimer);
+    selTimer = setTimeout(() => {
+      const sel = window.getSelection()?.toString().trim();
+      if (sel && sel.length > 30) logEvent('Selección extensa de texto');
+    }, 800);
+  });
+  // Impresión
+  window.addEventListener('beforeprint', () => logEvent('Intento de imprimir la página'));
 }
 
 async function logEvent(tipo) {
-  if(S.entregado) return;
-  const ev = { tipo, pregunta:S.currentIdx+1, hora:new Date().toLocaleTimeString('es-CO'), ts:Date.now() };
+  if (S.entregado) return;
+  S.eventAlertCount++;
+  const ev = { tipo, pregunta: S.currentIdx+1, hora: new Date().toLocaleTimeString('es-CO'), ts: Date.now() };
   S.eventos.push(ev);
   saveLocal();
-  const b=document.getElementById('warning-banner');
-  b.style.display='block'; setTimeout(()=>{b.style.display='none';},3000);
-  document.getElementById('events-count').textContent=`${S.eventos.length} evento${S.eventos.length!==1?'s':''}`;
+
+  // Banner top temporal
+  const b = document.getElementById('warning-banner');
+  b.style.display = 'block';
+  setTimeout(() => { b.style.display='none'; }, 3000);
+
+  // Contador en status bar
+  document.getElementById('events-count').textContent = `${S.eventos.length} evento${S.eventos.length!==1?'s':''}`;
+
+  // Actualizar widget persistente
+  updateAlertWidget();
+
+  // Alerta modal al estudiante
+  showEventAlert(tipo);
+
+  // Firebase
   try {
-    const ref=doc(db,'respuestas',S.examenId,'estudiantes',S.respDocId);
-    await updateDoc(ref,{eventos:arrayUnion(ev)});
-  } catch(_){}
+    await updateDoc(doc(db,'respuestas',S.examenId,'estudiantes',S.respDocId), { eventos: arrayUnion(ev) });
+  } catch(_) {}
 }
+
+function updateAlertWidget() {
+  const n       = S.eventos.length;
+  const widget  = document.getElementById('alert-widget');
+  const countEl = document.getElementById('widget-count');
+  const labelEl = document.getElementById('widget-label');
+  const barEl   = document.getElementById('widget-bar-fill');
+
+  if (n === 0) { widget.classList.remove('visible'); return; }
+
+  widget.classList.add('visible');
+  countEl.textContent = n;
+
+  // Mensaje según número de eventos
+  const MAX_WARN = 3; // a partir de aquí el mensaje es más severo
+  if (n === 1) {
+    labelEl.innerHTML = 'evento registrado.<br>⚠ Siguiente ocurrencia: <strong style="color:var(--danger)">examen anulado</strong>';
+  } else if (n === 2) {
+    labelEl.innerHTML = 'eventos registrados.<br>🚨 Estás en <strong style="color:var(--danger)">alerta máxima</strong>.<br>Próximo evento: nota en cero.';
+  } else {
+    labelEl.innerHTML = `eventos registrados.<br>🚨 <strong style="color:var(--danger)">El profesor revisará tu examen.</strong>`;
+  }
+
+  // Barra de peligro: se llena hasta MAX_WARN eventos
+  const pct = Math.min((n / MAX_WARN) * 100, 100);
+  barEl.style.width = pct + '%';
+}
+
+function showEventAlert(tipo) {
+  const msg = document.getElementById('event-alert-msg');
+  msg.innerHTML = `Se detectó: <strong>${tipo}</strong>.<br><br>Este evento fue registrado y será revisado por el profesor. <strong>En una próxima ocurrencia tu examen será anulado y la nota quedará en cero.</strong><br><br>Mantén el foco en esta pestaña durante todo el examen.`;
+  document.getElementById('event-alert').classList.add('visible');
+}
+window.closeEventAlert = () => document.getElementById('event-alert').classList.remove('visible');
 </script>
 </body>
 </html>

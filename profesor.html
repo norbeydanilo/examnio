@@ -14,7 +14,6 @@
   }
   *{box-sizing:border-box;margin:0;padding:0;}
   body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:14px;}
-
   #app{display:none;}
   #app.visible{display:flex;height:100vh;overflow:hidden;}
 
@@ -79,7 +78,6 @@
   .badge-yellow{background:rgba(243,156,18,.15);color:var(--warning);}
   .badge-red{background:rgba(231,76,60,.15);color:var(--danger);}
   .badge-blue{background:rgba(79,142,247,.15);color:var(--accent);}
-  .badge-gray{background:var(--surface2);color:var(--text2);}
 
   /* MONITOR */
   .monitor-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;}
@@ -88,7 +86,7 @@
   .student-card.finished{border-color:var(--success);}
   .student-name{font-size:13px;font-weight:600;margin-bottom:4px;}
   .student-meta{font-size:11px;color:var(--text2);margin-bottom:8px;}
-  .prog-bar-bg{height:4px;background:var(--border);border-radius:2px;overflow:hidden;}
+  .prog-bar-bg{height:4px;background:var(--border);border-radius:2px;overflow:hidden;margin-bottom:6px;}
   .prog-bar-fill{height:100%;background:var(--accent);border-radius:2px;transition:width .4s;}
   .event-chip{background:rgba(243,156,18,.15);color:var(--warning);border-radius:4px;font-size:10px;padding:2px 6px;margin:2px 2px 0 0;display:inline-block;}
 
@@ -96,7 +94,7 @@
   .grade-input{background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:var(--font);font-size:13px;padding:6px 10px;width:90px;outline:none;text-align:center;}
   .grade-input:focus{border-color:var(--accent);}
   .auto-grade{background:rgba(46,204,113,.1);border-radius:6px;color:var(--success);font-size:12px;font-weight:600;padding:4px 10px;display:inline-block;}
-  .resp-preview{background:var(--surface2);border-radius:6px;font-size:12px;max-width:260px;overflow:hidden;padding:4px 8px;text-overflow:ellipsis;white-space:nowrap;color:var(--text2);}
+  .resp-preview{background:var(--surface2);border-radius:6px;font-size:12px;max-width:240px;overflow:hidden;padding:4px 8px;text-overflow:ellipsis;white-space:nowrap;color:var(--text2);}
 
   /* TOGGLE */
   .toggle-wrap{display:flex;align-items:center;gap:8px;}
@@ -107,10 +105,8 @@
   .toggle input:checked+.toggle-slider{background:var(--success);}
   .toggle input:checked+.toggle-slider:before{transform:translateX(18px);}
 
-  /* ESCALA */
-  .scale-box{background:rgba(79,142,247,.08);border:1px solid rgba(79,142,247,.2);border-radius:8px;padding:14px;margin-top:10px;}
-  .scale-box p{font-size:12px;color:var(--text2);margin-bottom:8px;}
-  .scale-preview{font-size:18px;font-weight:700;color:var(--accent);}
+  /* SCALE BOX */
+  .scale-box{background:rgba(79,142,247,.08);border:1px solid rgba(79,142,247,.2);border-radius:8px;padding:14px;margin-top:10px;font-size:13px;color:var(--text2);}
 
   /* LOGIN */
   #login-screen{display:flex;align-items:center;justify-content:center;min-height:100vh;}
@@ -126,13 +122,16 @@
   .empty-state{text-align:center;color:var(--text2);padding:40px;font-size:13px;}
   .error-msg{background:rgba(231,76,60,.15);border:1px solid var(--danger);border-radius:8px;color:var(--danger);font-size:12px;margin-top:12px;padding:8px 12px;display:none;}
   hr{border:none;border-top:1px solid var(--border);margin:18px 0;}
-  #refresh-label{font-size:11px;color:var(--text2);}
   .btn-row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;}
+  #refresh-label{font-size:11px;color:var(--text2);}
+
+  /* DANGER ZONE */
+  .danger-zone{background:rgba(231,76,60,.05);border:1px solid rgba(231,76,60,.2);border-radius:8px;padding:16px;}
+  .danger-zone p{font-size:13px;color:var(--text2);margin-bottom:12px;}
 </style>
 </head>
 <body>
 
-<!-- LOGIN -->
 <div id="login-screen">
   <div class="login-box">
     <h1>Panel Profesor</h1>
@@ -146,7 +145,6 @@
   </div>
 </div>
 
-<!-- APP -->
 <div id="app">
   <div id="sidebar">
     <div class="sidebar-logo"><h1>ExamPanel</h1><p>Panel del Profesor</p></div>
@@ -157,6 +155,8 @@
     <div class="nav-item" onclick="goTab('tab-monitor',this)"><span class="nav-icon">👁</span>Monitor</div>
     <div class="nav-section">Evaluación</div>
     <div class="nav-item" onclick="goTab('tab-calificar',this)"><span class="nav-icon">✏️</span>Calificar</div>
+    <div class="nav-section">Administración</div>
+    <div class="nav-item" onclick="goTab('tab-admin',this)"><span class="nav-icon">🗑</span>Limpiar datos</div>
   </div>
 
   <div id="main">
@@ -202,43 +202,37 @@
             </div>
             <div class="grid-2">
               <div class="field"><label>Grupo</label><select id="ex-grupo"><option value="">— selecciona —</option></select></div>
-              <div class="field"><label>Subtítulo / instrucciones</label><input id="ex-sub" placeholder="ej: Responde con cuidado. Tiempo: 60 min."></div>
+              <div class="field"><label>Subtítulo / instrucciones</label><input id="ex-sub" placeholder="ej: Tiempo: 60 min. Responde con cuidado."></div>
             </div>
-
-            <!-- ESCALA DE CALIFICACIÓN -->
             <hr>
-            <div style="font-size:12px;color:var(--text2);margin-bottom:12px;font-weight:600;text-transform:uppercase;letter-spacing:.4px;">Escala de calificación</div>
+            <div style="font-size:12px;color:var(--text2);margin-bottom:12px;font-weight:600;text-transform:uppercase;letter-spacing:.4px;">Configuración del examen</div>
             <div class="grid-4">
+              <div class="field">
+                <label>Tiempo (minutos)</label>
+                <input type="number" id="ex-tiempo" value="60" min="0" placeholder="0 = sin límite">
+                <div class="hint">0 = sin temporizador</div>
+              </div>
               <div class="field">
                 <label>Nota mínima</label>
                 <input type="number" id="ex-nota-min" value="0" min="0" step="0.1" oninput="previewEscala()">
               </div>
               <div class="field">
                 <label>Nota máxima</label>
-                <input type="number" id="ex-nota-max" value="5" min="0" step="0.1" oninput="previewEscala()">
+                <input type="number" id="ex-nota-max" value="5" step="0.1" oninput="previewEscala()">
               </div>
               <div class="field">
                 <label>Nota aprobatoria</label>
-                <input type="number" id="ex-nota-apro" value="3" min="0" step="0.1" oninput="previewEscala()">
-              </div>
-              <div class="field">
-                <label>Valor de 1 punto</label>
-                <input type="number" id="ex-punto-val" value="0.25" min="0.01" step="0.01" oninput="previewEscala()">
-                <div class="hint">Cuánto suma 1 punto en la nota final</div>
+                <input type="number" id="ex-nota-apro" value="3" step="0.1" oninput="previewEscala()">
               </div>
             </div>
             <div class="scale-box" id="scale-preview-box">
-              <p>Con esta escala: 1 punto = <strong id="sp-val">0.25</strong> en la nota.
-                 Si el examen tiene <strong id="sp-pts">?</strong> puntos en total,
-                 la nota máxima posible es <strong id="sp-max-calc">?</strong>
-                 (escala <strong id="sp-min">0</strong> – <strong id="sp-maxN">5</strong>,
-                 aprueba con <strong id="sp-apro">3</strong>).</p>
+              La nota se calcula como: <strong>notaFinal = notaMin + (puntosObtenidos / puntosTotal) × (notaMax − notaMin)</strong><br>
+              Con <strong id="sp-pts">?</strong> puntos totales en el JSON: obtener todos da <strong id="sp-notamax">5.0</strong>, cero da <strong id="sp-notamin">0.0</strong>, aprueba con <strong id="sp-apro">3.0</strong>.
             </div>
             <hr>
-
             <div class="field">
               <label>Preguntas (JSON)</label>
-              <textarea id="ex-json" oninput="previewEscala()" placeholder='[{"id":"p0","tipo":"unica","enunciado":"...","opciones":["A)...","B)..."],"correcta":"A","puntaje":1,"autoCalificable":true}]'></textarea>
+              <textarea id="ex-json" oninput="previewEscala()" placeholder='[{"id":"p0","tipo":"unica","enunciado":"...","opciones":["A)...","B)..."],"correcta":"A)...","puntaje":1,"autoCalificable":true}]'></textarea>
             </div>
             <div class="btn-row">
               <button class="btn secondary" onclick="validarJSON()">Validar JSON</button>
@@ -276,12 +270,47 @@
       <div id="tab-calificar" class="tab-content">
         <div class="card">
           <div class="card-header"><h3>Seleccionar examen</h3></div>
-          <div class="card-body" style="display:flex;gap:10px;">
-            <select id="cal-examen" style="flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:8px 12px;font-family:var(--font);outline:none;"><option value="">— selecciona —</option></select>
+          <div class="card-body" style="display:flex;gap:10px;flex-wrap:wrap;">
+            <select id="cal-examen" style="flex:1;min-width:200px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:8px 12px;font-family:var(--font);outline:none;"><option value="">— selecciona —</option></select>
             <button class="btn" onclick="loadCalificacion()">Cargar respuestas</button>
+            <button class="btn secondary" onclick="descargarExcel()" id="btn-excel" style="display:none">⬇ Descargar Excel</button>
           </div>
         </div>
         <div id="cal-content"></div>
+      </div>
+
+      <!-- ADMIN -->
+      <div id="tab-admin" class="tab-content">
+        <div class="card">
+          <div class="card-header"><h3>Eliminar intentos de un examen</h3></div>
+          <div class="card-body">
+            <p style="font-size:13px;color:var(--text2);margin-bottom:14px;">Elimina todas las respuestas de un examen específico (útil para limpiar pruebas antes del examen real).</p>
+            <div style="display:flex;gap:10px;flex-wrap:wrap;">
+              <select id="admin-examen" style="flex:1;min-width:200px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:8px 12px;font-family:var(--font);outline:none;"><option value="">— selecciona examen —</option></select>
+              <button class="btn danger" onclick="eliminarIntentos()">🗑 Eliminar intentos</button>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header"><h3>Eliminar un intento específico</h3></div>
+          <div class="card-body">
+            <p style="font-size:13px;color:var(--text2);margin-bottom:14px;">Elimina el intento de un estudiante puntual para que pueda reintentar.</p>
+            <div class="grid-2">
+              <div class="field"><label>Examen</label><select id="admin-ex2" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:9px 12px;font-family:var(--font);outline:none;"><option value="">— selecciona —</option></select></div>
+              <div class="field"><label>ID del estudiante</label><input id="admin-est-id" placeholder="ej: 1001234567-ana-torres"></div>
+            </div>
+            <button class="btn danger" onclick="eliminarIntentoEspecifico()">🗑 Eliminar este intento</button>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header"><h3 style="color:var(--danger)">⚠ Zona peligrosa</h3></div>
+          <div class="card-body">
+            <div class="danger-zone">
+              <p>Eliminar todos los datos de respuestas de todos los exámenes. Esta acción no se puede deshacer.</p>
+              <button class="btn danger" onclick="limpiarTodo()">🗑 Eliminar TODAS las respuestas</button>
+            </div>
+          </div>
+        </div>
       </div>
 
     </div>
@@ -306,7 +335,7 @@ const db = getFirestore(initializeApp(firebaseConfig));
 
 const PASS = 'profe2024'; // ← cambia esta contraseña
 let GRUPOS={}, EXAMENES={}, monUnsub=null, currentTab='tab-grupos';
-let CAL={examenId:null,examen:null,estudiantes:[]};
+let CAL = { examenId:null, examen:null, estudiantes:[] };
 
 // ── LOGIN ──
 window.doLogin = () => {
@@ -319,7 +348,7 @@ window.doLogin = () => {
   } else { e.textContent='Contraseña incorrecta.'; e.style.display='block'; }
 };
 
-async function initApp(){ await loadGrupos(); await loadExamenes(); fillExamenSelects(); }
+async function initApp() { await loadGrupos(); await loadExamenes(); fillExamenSelects(); }
 
 // ── NAV ──
 window.goTab = (tabId,el) => {
@@ -327,77 +356,83 @@ window.goTab = (tabId,el) => {
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   document.getElementById(tabId).classList.add('active');
   el.classList.add('active');
-  const titles={'tab-grupos':'Grupos','tab-examenes':'Exámenes','tab-monitor':'Monitor en tiempo real','tab-calificar':'Calificar'};
-  document.getElementById('topbar-title').textContent=titles[tabId]||'';
-  currentTab=tabId;
-  if(tabId!=='tab-monitor'&&monUnsub){monUnsub();monUnsub=null;}
+  const titles={'tab-grupos':'Grupos','tab-examenes':'Exámenes','tab-monitor':'Monitor en tiempo real','tab-calificar':'Calificar','tab-admin':'Administración de datos'};
+  document.getElementById('topbar-title').textContent = titles[tabId]||'';
+  currentTab = tabId;
+  if (tabId!=='tab-monitor'&&monUnsub) { monUnsub(); monUnsub=null; }
 };
-window.refreshCurrent=()=>{ if(currentTab==='tab-grupos')loadGrupos(); else if(currentTab==='tab-examenes')loadExamenes(); else if(currentTab==='tab-monitor')loadMonitor(); };
+window.refreshCurrent = () => {
+  if(currentTab==='tab-grupos') loadGrupos();
+  else if(currentTab==='tab-examenes') loadExamenes();
+  else if(currentTab==='tab-monitor') loadMonitor();
+};
 
 // ── GRUPOS ──
-async function loadGrupos(){
+async function loadGrupos() {
   const snap=await getDocs(collection(db,'grupos')); GRUPOS={};
   snap.forEach(d=>{GRUPOS[d.id]=d.data();}); renderGruposList(); fillGrupoSelects();
 }
-function renderGruposList(){
+function renderGruposList() {
   const el=document.getElementById('grupos-list'), keys=Object.keys(GRUPOS);
   if(!keys.length){el.innerHTML='<div class="empty-state">No hay grupos aún.</div>';return;}
   el.innerHTML=`<div class="table-wrap"><table><thead><tr><th>Universidad</th><th>Materia</th><th>Grupo</th><th>Año</th><th>ID</th><th></th></tr></thead><tbody>${
     keys.map(k=>{const g=GRUPOS[k];return`<tr><td>${g.universidad}</td><td>${g.materia}</td><td>${g.grupo}</td><td>${g.año}</td><td><code style="font-size:11px;color:var(--text2)">${k}</code></td><td><button class="btn danger sm" onclick="eliminarGrupo('${k}')">Eliminar</button></td></tr>`;}).join('')
   }</tbody></table></div>`;
 }
-window.crearGrupo=async()=>{
+window.crearGrupo = async () => {
   const u=v('g-univ'),m=v('g-mat'),g=v('g-grp'),a=v('g-año');
   if(!u||!m||!g||!a){toast('Completa todos los campos.','warning');return;}
   const id=`${sl(u)}-${sl(m)}-${sl(g)}-${a}`;
   await setDoc(doc(db,'grupos',id),{universidad:u,materia:m,grupo:g,año:a,creadoEn:serverTimestamp()});
-  toast('Grupo creado.'); await loadGrupos();
+  // Limpiar campos
+  ['g-univ','g-mat','g-grp','g-año'].forEach(id=>document.getElementById(id).value='');
+  toast('Grupo creado: '+id); await loadGrupos();
 };
-window.eliminarGrupo=async(id)=>{
+window.eliminarGrupo = async (id) => {
   if(!confirm(`¿Eliminar grupo "${id}"?`))return;
-  await deleteDoc(doc(db,'grupos',id)); await loadGrupos(); toast('Grupo eliminado.');
+  await deleteDoc(doc(db,'grupos',id));
+  clearMonitor();
+  await loadGrupos(); toast('Grupo eliminado.');
 };
-function fillGrupoSelects(){
-  const sel=document.getElementById('ex-grupo'); const cur=sel.value;
+function fillGrupoSelects() {
+  const sel=document.getElementById('ex-grupo'), cur=sel.value;
   sel.innerHTML='<option value="">— selecciona —</option>';
   Object.keys(GRUPOS).forEach(k=>{const g=GRUPOS[k];const o=document.createElement('option');o.value=k;o.textContent=`${g.universidad} / ${g.materia} / ${g.grupo} (${g.año})`;sel.appendChild(o);});
   if(cur)sel.value=cur;
 }
 
 // ── ESCALA PREVIEW ──
-window.previewEscala=()=>{
-  const valPunto = parseFloat(document.getElementById('ex-punto-val').value)||0.25;
-  const notaMin  = parseFloat(document.getElementById('ex-nota-min').value)||0;
-  const notaMax  = parseFloat(document.getElementById('ex-nota-max').value)||5;
-  const notaApro = parseFloat(document.getElementById('ex-nota-apro').value)||3;
-  let totalPts   = 0;
-  try { const arr=JSON.parse(document.getElementById('ex-json').value||'[]'); totalPts=arr.reduce((s,q)=>s+(q.puntaje||0),0); } catch(_){}
-  const maxCalc  = notaMin + totalPts * valPunto;
-  document.getElementById('sp-val').textContent      = valPunto;
-  document.getElementById('sp-pts').textContent      = totalPts||'?';
-  document.getElementById('sp-max-calc').textContent = totalPts ? maxCalc.toFixed(2) : '?';
-  document.getElementById('sp-min').textContent      = notaMin;
-  document.getElementById('sp-maxN').textContent     = notaMax;
-  document.getElementById('sp-apro').textContent     = notaApro;
+window.previewEscala = () => {
+  const notaMin=parseFloat(document.getElementById('ex-nota-min').value)||0;
+  const notaMax=parseFloat(document.getElementById('ex-nota-max').value)||5;
+  const notaApro=parseFloat(document.getElementById('ex-nota-apro').value)||3;
+  let totalPts=0;
+  try{const arr=JSON.parse(document.getElementById('ex-json').value||'[]');totalPts=arr.reduce((s,q)=>s+(q.puntaje||0),0);}catch(_){}
+  document.getElementById('sp-pts').textContent    = totalPts||'?';
+  document.getElementById('sp-notamax').textContent= notaMax.toFixed(1);
+  document.getElementById('sp-notamin').textContent= notaMin.toFixed(1);
+  document.getElementById('sp-apro').textContent   = notaApro.toFixed(1);
 };
 
 // ── EXÁMENES ──
-async function loadExamenes(){
+async function loadExamenes() {
   const snap=await getDocs(collection(db,'examenes')); EXAMENES={};
   snap.forEach(d=>{EXAMENES[d.id]=d.data();}); renderExamenesList();
 }
-function renderExamenesList(){
+function renderExamenesList() {
   const el=document.getElementById('examenes-list'), keys=Object.keys(EXAMENES);
   if(!keys.length){el.innerHTML='<div class="empty-state">No hay exámenes aún.</div>';return;}
-  el.innerHTML=`<div class="table-wrap"><table><thead><tr><th>Código</th><th>Título</th><th>Grupo</th><th>Escala</th><th>Preguntas</th><th>Estado</th><th>Retro</th><th>Acciones</th></tr></thead><tbody>${
+  el.innerHTML=`<div class="table-wrap"><table><thead><tr><th>Código</th><th>Título</th><th>Grupo</th><th>Tiempo</th><th>Escala</th><th>Pgs</th><th>Estado</th><th>Retro</th><th>Acciones</th></tr></thead><tbody>${
     keys.map(k=>{
       const ex=EXAMENES[k], g=GRUPOS[ex.grupoId]||{};
-      const esc=ex.escala||{notaMin:0,notaMax:5,notaApro:3,valorPunto:0.25};
+      const esc=ex.escala||{notaMin:0,notaMax:5,notaApro:3};
+      const tiempo=ex.tiempoMinutos?`${ex.tiempoMinutos} min`:'Sin límite';
       return`<tr>
         <td><code style="font-size:11px">${k}</code></td>
         <td>${ex.titulo}</td>
-        <td style="font-size:12px;color:var(--text2)">${g.materia||''}/${g.grupo||''}</td>
-        <td style="font-size:12px">1pt = <strong>${esc.valorPunto}</strong> | ${esc.notaMin}–${esc.notaMax} (aprueba: ${esc.notaApro})</td>
+        <td style="font-size:12px;color:var(--text2)">${g.grupo||'—'}</td>
+        <td style="font-size:12px">${tiempo}</td>
+        <td style="font-size:12px">${esc.notaMin}–${esc.notaMax} (≥${esc.notaApro})</td>
         <td>${(ex.preguntas||[]).length}</td>
         <td><label class="toggle-wrap"><label class="toggle"><input type="checkbox" ${ex.activo?'checked':''} onchange="toggleActivo('${k}',this.checked)"><span class="toggle-slider"></span></label><span style="font-size:12px">${ex.activo?'Activo':'Inactivo'}</span></label></td>
         <td><label class="toggle-wrap"><label class="toggle"><input type="checkbox" ${ex.retroAlimentacionVisible?'checked':''} onchange="toggleRetro('${k}',this.checked)"><span class="toggle-slider"></span></label><span style="font-size:12px">${ex.retroAlimentacionVisible?'Visible':'Oculta'}</span></label></td>
@@ -409,33 +444,53 @@ function renderExamenesList(){
     }).join('')
   }</tbody></table></div>`;
 }
-window.crearExamen=async()=>{
+window.crearExamen = async () => {
   const titulo=v('ex-titulo'), id=v('ex-id').toUpperCase().replace(/\s/g,''), grupoId=v('ex-grupo'), sub=v('ex-sub');
+  const tiempo=parseInt(document.getElementById('ex-tiempo').value)||0;
   const notaMin=parseFloat(document.getElementById('ex-nota-min').value)||0;
   const notaMax=parseFloat(document.getElementById('ex-nota-max').value)||5;
   const notaApro=parseFloat(document.getElementById('ex-nota-apro').value)||3;
-  const valorPunto=parseFloat(document.getElementById('ex-punto-val').value)||0.25;
   if(!titulo||!id||!grupoId){toast('Completa título, código y grupo.','warning');return;}
   let preguntas=[];
   try{ const t=document.getElementById('ex-json').value.trim(); if(t)preguntas=JSON.parse(t); }
   catch(_){toast('JSON inválido.','danger');return;}
-  await setDoc(doc(db,'examenes',id),{titulo,grupoId,subtitulo:sub,preguntas,activo:false,retroAlimentacionVisible:false,escala:{notaMin,notaMax,notaApro,valorPunto},creadoEn:serverTimestamp()});
+  await setDoc(doc(db,'examenes',id),{
+    titulo, grupoId, subtitulo:sub, preguntas,
+    tiempoMinutos:tiempo,
+    activo:false, retroAlimentacionVisible:false,
+    escala:{notaMin,notaMax,notaApro},
+    creadoEn:serverTimestamp(),
+  });
+  // Limpiar campos
+  ['ex-titulo','ex-id','ex-sub','ex-json'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('ex-grupo').value='';
+  document.getElementById('ex-tiempo').value='60';
+  document.getElementById('json-status').textContent='';
   toast('Examen creado: '+id); await loadExamenes(); fillExamenSelects();
 };
-window.toggleActivo=async(id,val)=>{ await updateDoc(doc(db,'examenes',id),{activo:val}); EXAMENES[id].activo=val; toast(val?`"${id}" activado.`:`"${id}" desactivado.`); };
-window.toggleRetro=async(id,val)=>{ await updateDoc(doc(db,'examenes',id),{retroAlimentacionVisible:val}); toast(val?'Retroalimentación visible.':'Retroalimentación oculta.'); };
-window.eliminarExamen=async(id)=>{ if(!confirm(`¿Eliminar "${id}"?`))return; await deleteDoc(doc(db,'examenes',id)); await loadExamenes(); fillExamenSelects(); toast('Examen eliminado.'); };
-window.verJSON=(id)=>{ const w=window.open('','_blank'); w.document.write(`<pre style="background:#0f1117;color:#c9d1d9;padding:20px;font-size:13px;font-family:monospace">${JSON.stringify(EXAMENES[id].preguntas,null,2)}</pre>`); };
-window.validarJSON=()=>{
+window.toggleActivo = async (id,val) => { await updateDoc(doc(db,'examenes',id),{activo:val}); EXAMENES[id].activo=val; toast(val?`"${id}" activado.`:`"${id}" desactivado.`); };
+window.toggleRetro  = async (id,val) => { await updateDoc(doc(db,'examenes',id),{retroAlimentacionVisible:val}); toast(val?'Retroalimentación visible para estudiantes.':'Retroalimentación oculta.'); };
+window.eliminarExamen = async (id) => {
+  if(!confirm(`¿Eliminar examen "${id}"?`))return;
+  await deleteDoc(doc(db,'examenes',id));
+  clearMonitor();
+  await loadExamenes(); fillExamenSelects(); toast('Examen eliminado.');
+};
+window.verJSON = (id) => { const w=window.open('','_blank'); w.document.write(`<pre style="background:#0f1117;color:#c9d1d9;padding:20px;font-size:13px;font-family:monospace">${JSON.stringify(EXAMENES[id].preguntas,null,2)}</pre>`); };
+window.validarJSON = () => {
   const st=document.getElementById('json-status');
-  try{ const a=JSON.parse(document.getElementById('ex-json').value||'[]'); if(!Array.isArray(a))throw new Error('Debe ser un array.');
-    st.textContent=`✅ Válido — ${a.length} preguntas, ${a.reduce((s,q)=>s+(q.puntaje||0),0)} pts totales`;
+  try{
+    const a=JSON.parse(document.getElementById('ex-json').value||'[]');
+    if(!Array.isArray(a))throw new Error('Debe ser un array.');
+    const pts=a.reduce((s,q)=>s+(q.puntaje||0),0);
+    st.textContent=`✅ Válido — ${a.length} preguntas, ${pts} pts totales`;
     st.style.color='var(--success)'; previewEscala();
   }catch(e){st.textContent='❌ '+e.message; st.style.color='var(--danger)';}
 };
-function fillExamenSelects(){
-  ['mon-examen','cal-examen'].forEach(selId=>{
-    const sel=document.getElementById(selId), cur=sel.value;
+function fillExamenSelects() {
+  ['mon-examen','cal-examen','admin-examen','admin-ex2'].forEach(selId=>{
+    const sel=document.getElementById(selId); if(!sel)return;
+    const cur=sel.value;
     sel.innerHTML='<option value="">— selecciona —</option>';
     Object.keys(EXAMENES).forEach(k=>{const o=document.createElement('option');o.value=k;o.textContent=`${k} — ${EXAMENES[k].titulo}`;sel.appendChild(o);});
     if(cur)sel.value=cur;
@@ -443,22 +498,21 @@ function fillExamenSelects(){
 }
 
 // ── MONITOR ──
-window.loadMonitor=()=>{
+window.loadMonitor = () => {
   const exId=document.getElementById('mon-examen').value;
   if(!exId){toast('Selecciona un examen.','warning');return;}
   if(monUnsub)monUnsub();
   document.getElementById('monitor-stats').style.display='block';
-  const ref=collection(db,'respuestas',exId,'estudiantes');
-  monUnsub=onSnapshot(ref,snap=>{
+  monUnsub = onSnapshot(collection(db,'respuestas',exId,'estudiantes'), snap=>{
     const students=[]; snap.forEach(d=>students.push({id:d.id,...d.data()}));
     renderMonitor(students,EXAMENES[exId]);
     document.getElementById('refresh-label').textContent='Actualizado: '+new Date().toLocaleTimeString('es-CO');
   });
 };
-function renderMonitor(students,examen){
-  document.getElementById('stat-total').textContent=students.length;
-  document.getElementById('stat-done').textContent=students.filter(s=>s.entregado).length;
-  document.getElementById('stat-events').textContent=students.filter(s=>(s.eventos||[]).length>0).length;
+function renderMonitor(students,examen) {
+  document.getElementById('stat-total').textContent  = students.length;
+  document.getElementById('stat-done').textContent   = students.filter(s=>s.entregado).length;
+  document.getElementById('stat-events').textContent = students.filter(s=>(s.eventos||[]).length>0).length;
   const grid=document.getElementById('monitor-grid'), numQ=(examen?.preguntas||[]).length;
   if(!students.length){grid.innerHTML='<div class="empty-state">Ningún estudiante conectado aún.</div>';return;}
   grid.innerHTML=students.map(s=>{
@@ -467,16 +521,22 @@ function renderMonitor(students,examen){
     return`<div class="student-card ${cls}">
       <div class="student-name">${s.nombre}</div>
       <div class="student-meta">${s.codigo}</div>
-      <div style="font-size:12px;margin-bottom:6px">${resp}/${numQ} respondidas</div>
+      <div style="font-size:12px;margin-bottom:4px">${resp}/${numQ} respondidas</div>
       <div class="prog-bar-bg"><div class="prog-bar-fill" style="width:${pct}%"></div></div>
-      ${s.entregado?'<div style="margin-top:8px"><span class="badge badge-green">Entregado</span></div>':''}
-      ${events.length?`<div style="margin-top:8px">${events.map(e=>`<span class="event-chip" title="${e.hora}">⚠ P${e.pregunta}</span>`).join('')}</div>`:''}
+      ${s.entregado?'<span class="badge badge-green" style="margin-top:6px;display:inline-block">Entregado</span>':''}
+      ${s.entregadoForzado?'<span class="badge badge-yellow" style="margin-top:4px;display:inline-block">Tiempo agotado</span>':''}
+      ${events.length?`<div style="margin-top:6px">${events.slice(-3).map(e=>`<span class="event-chip" title="${e.tipo} — ${e.hora}">⚠ P${e.pregunta}</span>`).join('')}${events.length>3?`<span class="event-chip">+${events.length-3}</span>`:''}</div>`:''}
     </div>`;
   }).join('');
 }
+function clearMonitor() {
+  if(monUnsub){monUnsub();monUnsub=null;}
+  document.getElementById('monitor-stats').style.display='none';
+  document.getElementById('monitor-grid').innerHTML='';
+}
 
 // ── CALIFICACIÓN ──
-window.loadCalificacion=async()=>{
+window.loadCalificacion = async () => {
   const exId=document.getElementById('cal-examen').value;
   if(!exId){toast('Selecciona un examen.','warning');return;}
   document.getElementById('cal-content').innerHTML='<div class="empty-state"><span class="spinner"></span></div>';
@@ -484,31 +544,46 @@ window.loadCalificacion=async()=>{
   const snap=await getDocs(collection(db,'respuestas',exId,'estudiantes'));
   const students=[]; snap.forEach(d=>students.push({id:d.id,...d.data()}));
   CAL={examenId:exId,examen,estudiantes:students};
+  document.getElementById('btn-excel').style.display = students.length ? 'block' : 'none';
   renderCalificacion();
 };
-function renderCalificacion(){
+
+function calcNota(ptsObtenidos, ptsTotal, esc) {
+  // Regla de tres: ptsObtenidos/ptsTotal → en escala notaMin–notaMax
+  if (!ptsTotal) return esc.notaMin;
+  const nota = esc.notaMin + (ptsObtenidos / ptsTotal) * (esc.notaMax - esc.notaMin);
+  return Math.min(parseFloat(nota.toFixed(2)), esc.notaMax);
+}
+
+function renderCalificacion() {
   const {examen,estudiantes}=CAL;
   if(!estudiantes.length){document.getElementById('cal-content').innerHTML='<div class="empty-state">No hay respuestas aún.</div>';return;}
-  const preguntas=examen.preguntas||[];
-  const esc=examen.escala||{notaMin:0,notaMax:5,notaApro:3,valorPunto:0.25};
-  const maxPts=preguntas.reduce((s,q)=>s+q.puntaje,0);
+  const preguntas = examen.preguntas||[];
+  const esc       = examen.escala||{notaMin:0,notaMax:5,notaApro:3};
+  const ptsTotal  = preguntas.reduce((s,q)=>s+q.puntaje,0);
 
-  document.getElementById('cal-content').innerHTML=estudiantes.map((s,si)=>{
-    const autoScore=calcAuto(s.respuestas||{},preguntas);
-    const notaAuto=(esc.notaMin+autoScore*esc.valorPunto).toFixed(2);
+  document.getElementById('cal-content').innerHTML = estudiantes.map((s,si)=>{
+    const autoScore = calcAuto(s.respuestas||{},preguntas);
+    const notaAuto  = calcNota(autoScore,ptsTotal,esc);
+    const aprueba   = notaAuto >= esc.notaApro;
     return`<div class="card" style="margin-bottom:20px;">
       <div class="card-header">
-        <h3>${s.nombre} <span style="font-weight:400;color:var(--text2);font-size:12px">${s.codigo}</span></h3>
+        <div>
+          <h3>${s.nombre} <span style="font-weight:400;color:var(--text2);font-size:12px">${s.codigo}</span></h3>
+          <div style="margin-top:4px;display:flex;gap:6px;flex-wrap:wrap;">
+            ${s.entregado?'<span class="badge badge-green">Entregado</span>':'<span class="badge badge-yellow">En progreso</span>'}
+            ${s.entregadoForzado?'<span class="badge badge-yellow">Tiempo agotado</span>':''}
+            ${(s.eventos||[]).length?`<span class="badge badge-yellow">⚠ ${s.eventos.length} evento${s.eventos.length!==1?'s':''}</span>`:''}
+          </div>
+        </div>
         <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
-          ${s.entregado?'<span class="badge badge-green">Entregado</span>':'<span class="badge badge-yellow">En progreso</span>'}
-          ${(s.eventos||[]).length?`<span class="badge badge-yellow">⚠ ${s.eventos.length} evento${s.eventos.length!==1?'s':''}</span>`:''}
-          <span style="font-size:12px;color:var(--text2)">Auto: <strong>${autoScore.toFixed(2)}</strong>/${maxPts} pts → <strong>${notaAuto}</strong></span>
+          <span style="font-size:12px;color:var(--text2)">Auto: <strong>${autoScore.toFixed(2)}</strong>/${ptsTotal} pts → <strong>${notaAuto}</strong> <span class="badge ${aprueba?'badge-green':'badge-red'}">${aprueba?'Aprueba':'Reprueba'}</span></span>
           <button class="btn success sm" onclick="guardarNota(${si})">Guardar nota</button>
         </div>
       </div>
       <div class="card-body">
         <div class="table-wrap"><table>
-          <thead><tr><th>#</th><th>Tipo</th><th>Respuesta</th><th>Auto</th><th>Manual</th></tr></thead>
+          <thead><tr><th>#</th><th>Tipo</th><th>Respuesta del estudiante</th><th>Puntos auto</th><th>Puntos manual</th></tr></thead>
           <tbody>${preguntas.map((q,qi)=>{
             const resp=(s.respuestas||{})[qi];
             const auto=q.autoCalificable?calcPregunta(resp,q):null;
@@ -520,29 +595,33 @@ function renderCalificacion(){
               <td>${auto!==null?`<span class="auto-grade">${auto.toFixed(2)}/${q.puntaje}</span>`:'<span style="color:var(--text2);font-size:12px">—</span>'}</td>
               <td>${!q.autoCalificable
                 ?`<input class="grade-input" type="number" min="0" max="${q.puntaje}" step="0.25" id="man-${si}-${q.id}" value="${prevMan!==undefined?prevMan:''}" placeholder="0–${q.puntaje}">`
-                :'<span style="color:var(--text2);font-size:11px">automático</span>'}</td>
+                :'<span style="color:var(--text2);font-size:11px">auto</span>'}</td>
             </tr>`;
           }).join('')}</tbody>
         </table></div>
 
-        <!-- Nota final -->
         <div style="margin-top:16px;background:var(--surface2);border-radius:8px;padding:14px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
-          <span style="font-size:12px;color:var(--text2)">Nota final (escala ${esc.notaMin}–${esc.notaMax}):</span>
+          <span style="font-size:12px;color:var(--text2)">Nota final (${esc.notaMin}–${esc.notaMax}):</span>
           <input class="grade-input" type="number" min="${esc.notaMin}" max="${esc.notaMax}" step="0.1"
-            id="nota-final-${si}" value="${s.calificacion!==null&&s.calificacion!==undefined?s.calificacion:''}"
-            placeholder="${esc.notaMin}–${esc.notaMax}">
-          <span style="font-size:12px;color:var(--text2)">Sugerida automáticamente: <strong style="color:var(--accent)">${notaAuto}</strong></span>
-          <span class="badge ${parseFloat(notaAuto)>=esc.notaApro?'badge-green':'badge-red'}">${parseFloat(notaAuto)>=esc.notaApro?'Aprueba':'Reprueba'}</span>
+            id="nota-final-${si}" value="${s.calificacion!==null&&s.calificacion!==undefined?s.calificacion:''}" placeholder="${esc.notaMin}–${esc.notaMax}">
+          <span style="font-size:12px;color:var(--text2)">Calculada automáticamente: <strong style="color:var(--accent)">${notaAuto}</strong></span>
         </div>
 
-        ${(s.eventos||[]).length?`<hr><div style="font-size:12px;color:var(--warning);margin-bottom:8px;">⚠ Eventos registrados:</div><div style="display:flex;flex-wrap:wrap;gap:6px;">${s.eventos.map(e=>`<span class="badge badge-yellow">${e.hora} — P${e.pregunta}: ${e.tipo}</span>`).join('')}</div>`:''}
+        ${(s.eventos||[]).length?`
+          <hr>
+          <div style="font-size:12px;color:var(--warning);margin-bottom:8px;font-weight:600;">⚠ Eventos registrados (${s.eventos.length})</div>
+          <div style="display:flex;flex-wrap:wrap;gap:6px;">
+            ${s.eventos.map(e=>`<span class="badge badge-yellow" title="${e.tipo}">${e.hora} — P${e.pregunta}: ${e.tipo.substring(0,30)}${e.tipo.length>30?'…':''}</span>`).join('')}
+          </div>`:''}
       </div>
     </div>`;
   }).join('');
 }
-window.guardarNota=async(si)=>{
+
+window.guardarNota = async (si) => {
   const {examenId,examen,estudiantes}=CAL, s=estudiantes[si];
-  const preguntas=examen.preguntas||[], esc=examen.escala||{notaMin:0,notaMax:5,notaApro:3,valorPunto:0.25};
+  const preguntas=examen.preguntas||[], esc=examen.escala||{notaMin:0,notaMax:5,notaApro:3};
+  const ptsTotal=preguntas.reduce((sum,q)=>sum+q.puntaje,0);
   const manual={};
   preguntas.filter(q=>!q.autoCalificable).forEach(q=>{
     const inp=document.getElementById(`man-${si}-${q.id}`);
@@ -554,31 +633,128 @@ window.guardarNota=async(si)=>{
     else if(manual[q.id]!==undefined) totalPts+=manual[q.id];
   });
   let notaFinal=parseFloat(document.getElementById(`nota-final-${si}`).value);
-  if(isNaN(notaFinal)) notaFinal=parseFloat((esc.notaMin+totalPts*esc.valorPunto).toFixed(2));
+  if(isNaN(notaFinal)) notaFinal=calcNota(totalPts,ptsTotal,esc);
   notaFinal=Math.min(notaFinal,esc.notaMax);
-  await updateDoc(doc(db,'respuestas',examenId,'estudiantes',s.id),{calificacion:notaFinal,calificacionManual:manual,puntajeTotal:parseFloat(totalPts.toFixed(2))});
+  await updateDoc(doc(db,'respuestas',examenId,'estudiantes',s.id),{
+    calificacion:notaFinal, calificacionManual:manual, puntajeTotal:parseFloat(totalPts.toFixed(2)),
+  });
   CAL.estudiantes[si].calificacion=notaFinal; CAL.estudiantes[si].calificacionManual=manual;
   toast(`Nota de ${s.nombre}: ${notaFinal}`);
 };
 
 // ── CALIFICACIÓN AUTOMÁTICA ──
 function calcAuto(resp,preguntas){ return preguntas.reduce((s,q,qi)=>{ if(q.autoCalificable)s+=calcPregunta(resp[qi],q); return s; },0); }
-function calcPregunta(resp,q){
+function calcPregunta(resp,q) {
   if(resp===undefined||resp===null)return 0;
   switch(q.tipo){
-    case 'unica': return q.opciones[resp]===q.correcta?q.puntaje:0;
-    case 'multiple':{ if(!Array.isArray(resp))return 0; const ci=q.correctas.map(c=>q.opciones.indexOf(c)).filter(i=>i>=0); return ci.every(i=>resp.includes(i))&&resp.every(i=>ci.includes(i))?q.puntaje:0; }
+    case 'unica': {
+      // resp es el índice de la opción seleccionada (ya aleatorizada)
+      // la opción seleccionada es q.opciones[resp]
+      // comparamos con q.correcta (el texto de la opción correcta)
+      if(typeof resp==='number') return q.opciones&&q.opciones[resp]===q.correcta?q.puntaje:0;
+      return resp===q.correcta?q.puntaje:0;
+    }
+    case 'multiple': {
+      if(!Array.isArray(resp))return 0;
+      // resp es array de índices, q.correctas es array de textos
+      const correctasTexto=q.correctas||[];
+      const selTextos=(q.opciones||[]).filter((_,i)=>resp.includes(i));
+      const todasCorr=correctasTexto.every(c=>selTextos.includes(c));
+      const sinExtra=selTextos.every(t=>correctasTexto.includes(t));
+      return todasCorr&&sinExtra?q.puntaje:0;
+    }
     case 'verdaderoFalso': return resp===q.correcta?q.puntaje:0;
-    case 'emparejar':{ let ok=0; q.pares.forEach((p,pi)=>{if(resp[pi]===p.derecha)ok++;}); return parseFloat(((ok/q.pares.length)*q.puntaje).toFixed(2)); }
-    case 'ordenar':{ if(!Array.isArray(resp))return 0; let ok=0; q.correctos.forEach((v,i)=>{if(resp[i]===v)ok++;}); return parseFloat(((ok/q.correctos.length)*q.puntaje).toFixed(2)); }
+    case 'emparejar': { let ok=0; q.pares.forEach((p,pi)=>{if(resp[pi]===p.derecha)ok++;}); return parseFloat(((ok/q.pares.length)*q.puntaje).toFixed(2)); }
+    case 'ordenar': { if(!Array.isArray(resp))return 0; let ok=0; q.correctos.forEach((val,i)=>{if(resp[i]===val)ok++;}); return parseFloat(((ok/q.correctos.length)*q.puntaje).toFixed(2)); }
     default: return 0;
   }
 }
 
+// ── EXCEL ──
+window.descargarExcel = () => {
+  const {examen,estudiantes}=CAL;
+  if(!estudiantes.length){toast('No hay datos para exportar.','warning');return;}
+  const esc=examen.escala||{notaMin:0,notaMax:5,notaApro:3};
+  const ptsTotal=(examen.preguntas||[]).reduce((s,q)=>s+q.puntaje,0);
+
+  // Construir CSV (compatible con Excel)
+  const rows=[['Nombre','Código','Entregado','Forzado por tiempo','Puntos obtenidos','Puntos totales','Nota','Aprueba','Eventos sospechosos','Inicio','Fin']];
+  estudiantes.forEach(s=>{
+    const auto=calcAuto(s.respuestas||{},examen.preguntas||[]);
+    const nota=s.calificacion!==null&&s.calificacion!==undefined?s.calificacion:calcNota(auto,ptsTotal,esc);
+    rows.push([
+      s.nombre, s.codigo,
+      s.entregado?'Sí':'No',
+      s.entregadoForzado?'Sí':'No',
+      auto.toFixed(2), ptsTotal, nota,
+      nota>=esc.notaApro?'Sí':'No',
+      (s.eventos||[]).length,
+      s.inicio?.toDate?.().toLocaleString('es-CO')||'—',
+      s.fin?.toDate?.().toLocaleString('es-CO')||'—',
+    ]);
+  });
+
+  const csv = rows.map(r=>r.map(cell=>`"${String(cell).replace(/"/g,'""')}"`).join(',')).join('\n');
+  const blob = new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8;'});
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href=url; a.download=`notas-${CAL.examenId}.csv`;
+  a.click(); URL.revokeObjectURL(url);
+  toast('Archivo descargado.');
+};
+
+// ── ADMIN / LIMPIAR DATOS ──
+window.eliminarIntentos = async () => {
+  const exId=document.getElementById('admin-examen').value;
+  if(!exId){toast('Selecciona un examen.','warning');return;}
+  if(!confirm(`¿Eliminar TODOS los intentos del examen "${exId}"? Esta acción no se puede deshacer.`))return;
+  const snap=await getDocs(collection(db,'respuestas',exId,'estudiantes'));
+  const dels=[];
+  snap.forEach(d=>dels.push(deleteDoc(doc(db,'respuestas',exId,'estudiantes',d.id))));
+  await Promise.all(dels);
+  clearMonitor();
+  toast(`${dels.length} intento(s) eliminados de "${exId}".`);
+};
+
+window.eliminarIntentoEspecifico = async () => {
+  const exId=document.getElementById('admin-ex2').value;
+  const estId=document.getElementById('admin-est-id').value.trim();
+  if(!exId||!estId){toast('Completa examen e ID del estudiante.','warning');return;}
+  if(!confirm(`¿Eliminar el intento de "${estId}" en "${exId}"?`))return;
+  try{
+    await deleteDoc(doc(db,'respuestas',exId,'estudiantes',estId));
+    document.getElementById('admin-est-id').value='';
+    clearMonitor();
+    toast('Intento eliminado.');
+  }catch(e){ toast('No se encontró ese intento.','danger'); }
+};
+
+window.limpiarTodo = async () => {
+  if(!confirm('⚠ ¿Eliminar TODAS las respuestas de TODOS los exámenes? Esta acción es irreversible.'))return;
+  if(!confirm('Segunda confirmación: ¿estás seguro?'))return;
+  const exIds=Object.keys(EXAMENES);
+  let total=0;
+  for(const exId of exIds){
+    const snap=await getDocs(collection(db,'respuestas',exId,'estudiantes'));
+    const dels=[];
+    snap.forEach(d=>dels.push(deleteDoc(doc(db,'respuestas',exId,'estudiantes',d.id))));
+    await Promise.all(dels);
+    total+=dels.length;
+  }
+  clearMonitor();
+  toast(`${total} intento(s) eliminados en total.`);
+};
+
 // ── UTILS ──
 const v  = id => document.getElementById(id).value.trim();
 const sl = s  => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]/g,'-').replace(/-+/g,'-').replace(/^-|-$/g,'');
-const fmtResp = r => { if(r===undefined||r===null)return'—'; if(typeof r==='boolean')return r?'Verdadero':'Falso'; if(Array.isArray(r))return r.join(', '); if(typeof r==='object')return Object.entries(r).map(([k,v])=>`${parseInt(k)+1}→${v}`).join(' | '); return String(r); };
+const fmtResp = r => {
+  if(r===undefined||r===null)return'—';
+  if(typeof r==='boolean')return r?'Verdadero':'Falso';
+  if(Array.isArray(r))return r.join(', ');
+  if(typeof r==='object')return Object.entries(r).map(([k,vl])=>`${parseInt(k)+1}→${vl}`).join(' | ');
+  return String(r);
+};
 
 let toastTimer;
 window.toast=(msg,type='success')=>{
@@ -587,7 +763,7 @@ window.toast=(msg,type='success')=>{
   const el=document.createElement('div'); el.className='toast';
   el.style.borderColor=type==='danger'?'var(--danger)':type==='warning'?'var(--warning)':'var(--success)';
   el.textContent=msg; document.body.appendChild(el);
-  toastTimer=setTimeout(()=>el.remove(),3000);
+  toastTimer=setTimeout(()=>el.remove(),3500);
 };
 </script>
 </body>
