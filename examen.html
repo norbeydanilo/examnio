@@ -921,7 +921,7 @@ function startHeartbeat() {
   };
 
   sendBeat();
-  setInterval(sendBeat, 10000);
+  setInterval(sendBeat, 30000); // cada 30 segundos
 
   // Registrar cuando la página pierde visibilidad (posible desconexión)
   document.addEventListener('visibilitychange', async () => {
