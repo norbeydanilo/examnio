@@ -1335,23 +1335,22 @@ function renderCodigoConLineas(codigo, lenguaje) {
   const prismLang = {'java':'java','python':'python','javascript':'javascript',
     'js':'javascript','sql':'sql','cpp':'cpp','csharp':'csharp'}[lang]||lang;
 
-  // Escapar HTML
-  const escaped = codigo
-    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-
-  // Resaltar con Prism si está disponible
-  let highlighted = escaped;
+  // Resaltar con Prism DIRECTAMENTE (sin pre-escapar — Prism lo maneja internamente)
+  let highlighted;
   if (window.Prism && window.Prism.languages[prismLang]) {
-    highlighted = window.Prism.highlight(escaped, window.Prism.languages[prismLang], prismLang);
+    highlighted = window.Prism.highlight(codigo, window.Prism.languages[prismLang], prismLang);
+  } else {
+    // Fallback: escapar manualmente si Prism no está disponible
+    highlighted = codigo.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   }
 
-  // Dividir por líneas y agregar número manual
+  // Dividir por líneas respetando el original
   const lineas = highlighted.split('\n');
-  // Quitar última línea vacía si existe
-  if (lineas[lineas.length-1] === '') lineas.pop();
+  // Quitar solo la última línea si está vacía (artefacto del split)
+  if (lineas.length > 0 && lineas[lineas.length-1].trim() === '') lineas.pop();
 
   const html = lineas.map((linea, i) =>
-    `<span class="code-line"><span class="line-num">${i+1}</span><span class="line-code">${linea}</span></span>`
+    `<span class="code-line"><span class="line-num">${i+1}</span><span class="line-code">${linea||' '}</span></span>`
   ).join('\n');
 
   return `<div class="code-wrap">
