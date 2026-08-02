@@ -1171,8 +1171,7 @@ function calcPregunta(resp,q){
   if(resp===undefined||resp===null||resp==='')return 0;
   switch(q.tipo){
     case 'unica':{
-      // Normalizar: 
- y " / " se consideran equivalentes para compatibilidad
+      // Normalizar: \n y " / " se consideran equivalentes
       const norm = s => String(s).replace(/\n/g,' / ').replace(/\s*\/\s*/g,' / ').trim();
       if(typeof resp==='string') return norm(resp)===norm(q.correcta)?q.puntaje:0;
       if(typeof resp==='number') return q.opciones&&norm(q.opciones[resp])===norm(q.correcta)?q.puntaje:0;
