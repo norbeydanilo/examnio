@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Examnio — Panel</title>
 
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-okaidia.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-vsc-dark-plus.min.css">
 
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 
@@ -25,6 +25,24 @@
   code[class*="language-"]{font-family:var(--mono)!important;}
   .line-numbers .line-numbers-rows{border-right:1px solid #333!important;background:#161616!important;}
   .line-numbers-rows>span:before{color:#555!important;}
+  /* Override Prism vsc-dark-plus para alineación perfecta */
+  pre[class*="language-"] {
+    margin: 0 !important;
+    border-radius: 0 !important;
+    border: none !important;
+  }
+  pre.line-numbers {
+    padding: 1em 1em 1em 3.8em !important;
+  }
+  .line-numbers .line-numbers-rows {
+    top: 0 !important;
+    left: 0 !important;
+    padding: 1em 0 !important;
+    border-right: 1px solid #444 !important;
+    background: #1a1a1a !important;
+    width: 3em !important;
+  }
+  .line-numbers-rows > span:before { color: #555 !important; }
 /* Fix definitivo alineación line-numbers */
   pre.line-numbers {
     padding-top: 0 !important;
@@ -507,6 +525,7 @@
     if (window.emailjs) window.emailjs.init('eUxqvkBt-ic5Cbxao');
   });
 </script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/line-numbers/prism-line-numbers.min.css">
 <script>
 window.Prism = window.Prism || {};
 Prism.manual = true;
@@ -517,6 +536,7 @@ Prism.manual = true;
 <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-javascript.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-sql.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/line-numbers/prism-line-numbers.min.js"></script>
 
 
 <script type="module">
@@ -1026,7 +1046,7 @@ function renderCalificacion(){
   }).join('');
 
   // Activar Prism.js
-  
+  setTimeout(()=>{if(window.Prism)window.Prism.highlightAll();},100);
 }
 
 window.toggleAcordeon=(estId,header)=>{
@@ -1399,29 +1419,17 @@ function renderCodigoConLineas(codigo, lenguaje) {
   const prismLang = {'java':'java','python':'python','javascript':'javascript',
     'js':'javascript','sql':'sql','cpp':'cpp','csharp':'csharp'}[lang]||lang;
 
-  // Desescapar por si el código vino con entidades HTML del JSON
+  // Desescapar por si el código vino con entidades HTML
   const codigoLimpio = codigo
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&amp;/g, '&')
-    .replace(/&quot;/g, '"');
+    .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&').replace(/&quot;/g, '"');
 
-  // Resaltar con Prism (recibe código limpio, devuelve HTML con spans)
+  // Resaltar con Prism
   let highlighted;
   if (window.Prism && window.Prism.languages[prismLang]) {
     highlighted = window.Prism.highlight(codigoLimpio, window.Prism.languages[prismLang], prismLang);
   } else {
     highlighted = codigoLimpio.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   }
-
-  const lineas = highlighted.split('\n');
-  if (lineas.length > 0 && lineas[lineas.length-1].trim() === '') lineas.pop();
-
-  const html = lineas.map((linea, i) => {
-    const esVacia = linea.trim() === '';
-    const style = esVacia ? ' style="height:0.6em"' : '';
-    return `<span class="code-line"${style}><span class="line-num">${i+1}</span><span class="line-code">${linea||''}</span></span>`;
-  }).join('\n');
 
   return `<div class="code-wrap">
     <div class="code-header">
@@ -1430,7 +1438,7 @@ function renderCodigoConLineas(codigo, lenguaje) {
       <span class="code-dot" style="background:#28c840"></span>
       <span class="code-lang-label">${lenguaje||'Java'}</span>
     </div>
-    <pre><code>${html}</code></pre>
+    <pre class="line-numbers language-${prismLang}"><code class="language-${prismLang}">${highlighted}</code></pre>
   </div>`;
 }
 
