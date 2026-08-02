@@ -50,7 +50,11 @@
   }
   .code-line {
     display: flex;
-    line-height: 1.6;
+    line-height: 1.55;
+  }
+  .code-line[style*="height:0.5em"] {
+    line-height: 0.5em;
+    min-height: 0;
   }
   .line-num {
     display: inline-block;
@@ -1389,29 +1393,27 @@ window.toast=(msg,type='success')=>{
   toastTimer=setTimeout(()=>el.remove(),3500);
 };
 
-// Renderizar bloque de código con números de línea manuales
 function renderCodigoConLineas(codigo, lenguaje) {
   const lang = (lenguaje||'java').toLowerCase();
   const prismLang = {'java':'java','python':'python','javascript':'javascript',
     'js':'javascript','sql':'sql','cpp':'cpp','csharp':'csharp'}[lang]||lang;
 
-  // Resaltar con Prism DIRECTAMENTE (sin pre-escapar — Prism lo maneja internamente)
   let highlighted;
   if (window.Prism && window.Prism.languages[prismLang]) {
     highlighted = window.Prism.highlight(codigo, window.Prism.languages[prismLang], prismLang);
   } else {
-    // Fallback: escapar manualmente si Prism no está disponible
     highlighted = codigo.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   }
 
-  // Dividir por líneas respetando el original
   const lineas = highlighted.split('\n');
-  // Quitar solo la última línea si está vacía (artefacto del split)
   if (lineas.length > 0 && lineas[lineas.length-1].trim() === '') lineas.pop();
 
-  const html = lineas.map((linea, i) =>
-    `<span class="code-line"><span class="line-num">${i+1}</span><span class="line-code">${linea||' '}</span></span>`
-  ).join('\n');
+  const html = lineas.map((linea, i) => {
+    const esVacia = linea.trim() === '';
+    // Líneas vacías tienen altura reducida
+    const style = esVacia ? ' style="height:0.5em"' : '';
+    return `<span class="code-line"${style}><span class="line-num">${i+1}</span><span class="line-code">${linea||''}</span></span>`;
+  }).join('\n');
 
   return `<div class="code-wrap">
     <div class="code-header">
