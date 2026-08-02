@@ -6,7 +6,7 @@
 <title>Examnio</title>
 
 <!-- Prism.js One Dark theme -->
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-one-dark.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-okaidia.min.css">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/line-numbers/prism-line-numbers.min.css">
 
 <!-- JetBrains Mono font -->
@@ -480,7 +480,10 @@
 <div id="page-retro" class="page">
   <div class="retro-wrap">
     <div class="retro-header">
-      <h2 id="retro-title">Retroalimentación</h2>
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px;">
+        <h2 id="retro-title">Retroalimentación</h2>
+        <button onclick="window.location.hash='landing';window.location.reload()" style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text2);cursor:pointer;font-family:var(--font);font-size:12px;padding:6px 14px;transition:all .15s;" onmouseover="this.style.borderColor='var(--accent)';this.style.color='var(--text)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text2)'">✕ Salir</button>
+      </div>
       <p id="retro-subtitle"></p>
       <div class="retro-score">
         <div class="retro-score-box">
@@ -505,7 +508,13 @@
 </div>
 
 <!-- Prism.js -->
+<script>
+// Prism: no autoprocess — lo llamamos manualmente
+window.Prism = window.Prism || {};
+Prism.manual = true;
+</script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-core.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-clike.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-java.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-javascript.min.js"></script>
