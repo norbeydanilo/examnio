@@ -43,7 +43,28 @@
   }
   .line-numbers-rows > span:before { color: #555 !important; padding-right: 0.8em !important; }
 
-  /* Override Prism vsc-dark-plus */
+
+  /* Números de línea manuales */
+  .code-row {
+    display: flex;
+    line-height: 1.6;
+    font-size: 13px;
+    font-family: var(--mono);
+  }
+  .code-row-empty { line-height: 0.7; }
+  .ln {
+    min-width: 2.5em;
+    padding-right: 1em;
+    text-align: right;
+    color: #555;
+    user-select: none;
+    border-right: 1px solid #444;
+    margin-right: 1em;
+    flex-shrink: 0;
+  }
+  .lc { flex: 1; white-space: pre; }
+
+  /* Prism overrides */
   pre[class*="language-"] {
     margin: 0 !important;
     border-radius: 0 !important;
@@ -51,33 +72,8 @@
     background: var(--code-bg) !important;
     font-size: 13px !important;
     line-height: 1.6 !important;
-  }
-  pre.line-numbers {
-    padding: 0 1em 0 4.5em !important;
+    padding: 1em !important;
     overflow-x: auto !important;
-  }
-  pre.line-numbers > code {
-    display: block !important;
-    padding: 1em 0 !important;
-  }
-  .line-numbers .line-numbers-rows {
-    top: 0 !important;
-    left: 0 !important;
-    width: 3.8em !important;
-    padding: 0 !important;
-    margin-top: 0 !important;
-    border-right: 1px solid #444 !important;
-    background: #1a1a1a !important;
-    line-height: 1.6 !important;
-    font-size: 13px !important;
-  }
-  .line-numbers-rows > span {
-    display: block !important;
-    line-height: 1.6 !important;
-    padding: 0 !important;
-  }
-  .line-numbers-rows > span:first-child {
-    margin-top: 1em !important;
   }
 
   .code-wrap {
@@ -586,7 +582,6 @@ Prism.manual = true;
 <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-javascript.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-sql.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/line-numbers/prism-line-numbers.min.js"></script>
 
 
 <script type="module">
@@ -938,10 +933,6 @@ function renderQuestion(idx) {
 
   if (answered) lockUI(q, idx);
 
-  // Activar Prism para resaltado y line-numbers
-  if (q.codigo && window.Prism) {
-    setTimeout(() => window.Prism.highlightAllUnder(document.getElementById('question-area')), 10);
-  }
 }
 
 // ── RENDER UI POR TIPO ────────────────────────────────────────
@@ -1367,11 +1358,11 @@ function renderCodigoConLineas(codigo, lenguaje) {
   const prismLang = {'java':'java','python':'python','javascript':'javascript',
     'js':'javascript','sql':'sql','cpp':'cpp','csharp':'csharp'}[lang]||lang;
 
-  // Desescapar por si el código vino con entidades HTML
+  // Desescapar por si el código vino con entidades HTML del JSON
   const codigoLimpio = codigo
-    .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&').replace(/&quot;/g, '"');
+    .replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&amp;/g,'&').replace(/&quot;/g,'"');
 
-  // Resaltar con Prism
+  // Resaltar con Prism (colores)
   let highlighted;
   if (window.Prism && window.Prism.languages[prismLang]) {
     highlighted = window.Prism.highlight(codigoLimpio, window.Prism.languages[prismLang], prismLang);
@@ -1379,15 +1370,27 @@ function renderCodigoConLineas(codigo, lenguaje) {
     highlighted = codigoLimpio.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   }
 
-  return `<div class="code-wrap">
-    <div class="code-header">
-      <span class="code-dot" style="background:#ff5f57"></span>
-      <span class="code-dot" style="background:#febc2e"></span>
-      <span class="code-dot" style="background:#28c840"></span>
-      <span class="code-lang-label">${lenguaje||'Java'}</span>
-    </div>
-    <pre class="line-numbers language-${prismLang}"><code class="language-${prismLang}">${highlighted}</code></pre>
-  </div>`;
+  // Números de línea manuales — alineación garantizada
+  const lineas = highlighted.split('\n');
+  if (lineas.length > 0 && lineas[lineas.length-1].trim() === '') lineas.pop();
+
+  const filas = lineas.map((linea, i) => {
+    const vacia = linea.trim() === '';
+    return '<div class="code-row' + (vacia ? ' code-row-empty' : '') + '">' +
+      '<span class="ln">' + (i+1) + '</span>' +
+      '<span class="lc">' + (linea||'') + '</span>' +
+      '</div>';
+  }).join('');
+
+  return '<div class="code-wrap">' +
+    '<div class="code-header">' +
+      '<span class="code-dot" style="background:#ff5f57"></span>' +
+      '<span class="code-dot" style="background:#febc2e"></span>' +
+      '<span class="code-dot" style="background:#28c840"></span>' +
+      '<span class="code-lang-label">' + (lenguaje||'Java') + '</span>' +
+    '</div>' +
+    '<pre><code>' + filas + '</code></pre>' +
+  '</div>';
 }
 
 </script>
