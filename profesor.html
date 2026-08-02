@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Panel Profesor — ExamPanel</title>
+<title>Examnio — Panel</title>
 
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-one-dark.min.css">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/line-numbers/prism-line-numbers.min.css">
@@ -192,7 +192,7 @@
 <!-- AUTH SCREEN -->
 <div id="auth-screen">
   <div class="auth-card">
-    <h1>ExamPanel</h1>
+    <h1>Examnio</h1>
     <p>Panel del Profesor — Acceso restringido</p>
     <div class="auth-tabs">
       <button class="auth-tab active" onclick="showAuthTab('login',this)">Iniciar sesión</button>
@@ -237,7 +237,7 @@
 <!-- APP -->
 <div id="app">
   <div id="sidebar">
-    <div class="sidebar-logo"><h1>ExamPanel</h1><p>Panel del Profesor</p></div>
+    <div class="sidebar-logo"><h1>Examnio</h1><p>Panel del Profesor</p></div>
     <div class="nav-section">Gestión</div>
     <div class="nav-item active" onclick="goTab('tab-grupos',this,'Grupos')"><span class="nav-icon">🏫</span>Grupos</div>
     <div class="nav-item" onclick="goTab('tab-examenes',this,'Exámenes')"><span class="nav-icon">📋</span>Exámenes</div>
@@ -246,6 +246,7 @@
     <div class="nav-section">Evaluación</div>
     <div class="nav-item" onclick="goTab('tab-calificar',this,'Calificar')"><span class="nav-icon">✏️</span>Calificar</div>
     <div class="nav-section">Admin</div>
+    <div class="nav-item" onclick="goTab('tab-solicitudes',this,'Solicitudes de acceso')"><span class="nav-icon">🔔</span>Solicitudes <span id="badge-solicitudes" style="display:none;background:var(--danger);color:#fff;border-radius:10px;font-size:10px;padding:1px 6px;margin-left:4px">0</span></div>
     <div class="nav-item" onclick="goTab('tab-admin',this,'Administración')"><span class="nav-icon">🗑</span>Limpiar datos</div>
     <div class="sidebar-bottom">
       <div class="user-pill">
@@ -309,8 +310,8 @@
             <div class="grid-4">
               <div class="field"><label>Tiempo (min)</label><input type="number" id="ex-tiempo" value="60" min="0"><div class="hint">0 = sin límite</div></div>
               <div class="field"><label>Nota mínima</label><input type="number" id="ex-nota-min" value="0" step="0.1" oninput="previewEscala()"></div>
-              <div class="field"><label>Nota máxima</label><input type="number" id="ex-nota-max" value="5" step="0.1" oninput="previewEscala()"></div>
-              <div class="field"><label>Nota aprobatoria</label><input type="number" id="ex-nota-apro" value="3" step="0.1" oninput="previewEscala()"></div>
+              <div class="field"><label>Nota máxima</label><input type="number" id="ex-nota-max" value="50" step="0.1" oninput="previewEscala()"></div>
+              <div class="field"><label>Nota aprobatoria</label><input type="number" id="ex-nota-apro" value="30" step="0.1" oninput="previewEscala()"></div>
             </div>
             <div class="scale-box" id="scale-preview-box">Fórmula: notaFinal = notaMin + (ptsObtenidos / ptsTotal) × (notaMax − notaMin)<br>Con <strong id="sp-pts">?</strong> pts totales en el JSON: nota máx = <strong id="sp-notamax">5.0</strong>, aprueba con <strong id="sp-apro">3.0</strong></div>
             <hr>
@@ -375,6 +376,18 @@
         <div id="cal-content"></div>
       </div>
 
+      <!-- SOLICITUDES -->
+      <div id="tab-solicitudes" class="tab-content">
+        <div class="card">
+          <div class="card-header"><h3>Solicitudes de acceso pendientes</h3></div>
+          <div class="card-body"><div id="solicitudes-list"><div class="empty-state">Cargando...</div></div></div>
+        </div>
+        <div class="card">
+          <div class="card-header"><h3>Profesores aprobados</h3></div>
+          <div class="card-body"><div id="profesores-list"><div class="empty-state">Cargando...</div></div></div>
+        </div>
+      </div>
+
       <!-- ADMIN -->
       <div id="tab-admin" class="tab-content">
         <div class="card">
@@ -426,8 +439,18 @@
   </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+<script>
+  // Inicializar EmailJS (debe ser antes del módulo ES)
+  document.addEventListener('DOMContentLoaded', () => {
+    if (window.emailjs) window.emailjs.init('eUxqvkBt-ic5Cbxao');
+  });
+</script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-core.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-java.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-javascript.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-sql.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/line-numbers/prism-line-numbers.min.js"></script>
 
 <script type="module">
@@ -452,6 +475,11 @@ const fbApp = initializeApp(firebaseConfig);
 const auth  = getAuth(fbApp);
 const db    = getFirestore(fbApp);
 
+// EmailJS
+const EMAILJS_SERVICE  = 'service_ho3a6su';
+const EMAILJS_TEMPLATE = 'template_qinj95m';
+const EMAILJS_KEY      = 'eUxqvkBt-ic5Cbxao';
+
 let GRUPOS={}, EXAMENES={}, monUnsub=null, currentTab='tab-grupos';
 let monFilter='todos', calFilter='todos';
 let CAL={examenId:null,examen:null,estudiantes:[]};
@@ -460,7 +488,8 @@ let monStudentsCache=[];
 // ── HASH ROUTING ──────────────────────────────────────────────
 const ROUTES = {
   'grupos':'tab-grupos','examenes':'tab-examenes',
-  'monitor':'tab-monitor','calificar':'tab-calificar','admin':'tab-admin'
+  'monitor':'tab-monitor','calificar':'tab-calificar',
+  'solicitudes':'tab-solicitudes','admin':'tab-admin'
 };
 function handleRoute(){
   const hash=window.location.hash.replace('#/','').replace('#','');
@@ -472,14 +501,32 @@ function handleRoute(){
 window.addEventListener('hashchange',handleRoute);
 
 // ── AUTH ──────────────────────────────────────────────────────
-onAuthStateChanged(auth, user => {
+onAuthStateChanged(auth, async user => {
   if(user){
+    // Verificar que esté aprobado en Firestore
+    const profSnap = await getDoc(doc(db,'profesores',user.uid));
+    if (!profSnap.exists() || profSnap.data().estado !== 'aprobado') {
+      // No aprobado — cerrar sesión y mostrar mensaje
+      await signOut(auth);
+      const err = document.getElementById('auth-error');
+      err.style.background = 'rgba(243,156,18,.15)';
+      err.style.borderColor = 'var(--warning)';
+      err.style.color = 'var(--warning)';
+      err.textContent = '⏳ Tu cuenta está pendiente de aprobación por el administrador.';
+      err.style.display = 'block';
+      return;
+    }
     document.getElementById('auth-screen').style.display='none';
     document.getElementById('app').classList.add('visible');
     document.getElementById('user-name').textContent  = user.displayName||user.email.split('@')[0];
     document.getElementById('user-email').textContent = user.email;
     document.getElementById('user-avatar').textContent= (user.displayName||user.email)[0].toUpperCase();
+    // Mostrar sección de solicitudes solo a admins
+    const esAdmin = profSnap.data().admin === true;
+    const navSol = document.querySelector('.nav-item[onclick*="tab-solicitudes"]');
+    if (navSol) navSol.style.display = esAdmin ? 'flex' : 'none';
     initApp();
+    if (esAdmin) cargarSolicitudes();
   } else {
     document.getElementById('auth-screen').style.display='flex';
     document.getElementById('app').classList.remove('visible');
@@ -508,10 +555,47 @@ window.doRegister = async () => {
   const err=document.getElementById('auth-error');
   err.style.display='none';
   if(!nombre||!email||!pass){ err.textContent='Completa todos los campos.'; err.style.display='block'; return; }
-  try{
-    const cred=await createUserWithEmailAndPassword(auth,email,pass);
-    await updateProfile(cred.user,{displayName:nombre});
-  }catch(e){ err.textContent=tradAuth(e.code); err.style.display='block'; }
+  try {
+    // Verificar si ya existe un admin (primer registro = admin automático)
+    const adminSnap = await getDocs(collection(db,'profesores'));
+    const esElPrimero = adminSnap.empty;
+
+    // Crear cuenta en Firebase Auth
+    const cred = await createUserWithEmailAndPassword(auth, email, pass);
+    await updateProfile(cred.user, { displayName: nombre });
+
+    if (esElPrimero) {
+      // Primer registro: aprobado automáticamente como admin
+      await setDoc(doc(db,'profesores',cred.user.uid), {
+        nombre, email, estado: 'aprobado', admin: true,
+        creadoEn: serverTimestamp(), aprobadoEn: serverTimestamp(),
+      });
+      toast('Cuenta creada. Bienvenido, administrador.');
+    } else {
+      // Registro posterior: queda pendiente
+      await setDoc(doc(db,'profesores',cred.user.uid), {
+        nombre, email, estado: 'pendiente', admin: false,
+        creadoEn: serverTimestamp(),
+      });
+      // Cerrar sesión hasta que sea aprobado
+      await signOut(auth);
+      // Notificar por EmailJS
+      try {
+        if (window.emailjs) {
+          await window.emailjs.send(EMAILJS_SERVICE, EMAILJS_TEMPLATE, {
+            nombre, correo: email,
+            fecha: new Date().toLocaleString('es-CO'),
+          });
+        }
+      } catch(mailErr) { console.warn('Email no enviado:', mailErr); }
+
+      err.style.background = 'rgba(243,156,18,.15)';
+      err.style.borderColor = 'var(--warning)';
+      err.style.color = 'var(--warning)';
+      err.textContent = '⏳ Tu solicitud fue enviada. El administrador debe aprobarla antes de que puedas acceder.';
+      err.style.display = 'block';
+    }
+  } catch(e) { err.textContent=tradAuth(e.code); err.style.display='block'; }
 };
 
 window.doLogout = async () => { if(confirm('¿Cerrar sesión?'))await signOut(auth); };
@@ -869,7 +953,7 @@ function renderCalificacion(){
   }).join('');
 
   // Activar Prism.js
-  setTimeout(()=>{if(window.Prism)window.Prism.highlightAll();},100);
+  setTimeout(()=>{if(window.Prism)window.Prism.highlightAll();},150);
 }
 
 window.toggleAcordeon=(estId,header)=>{
@@ -1017,6 +1101,80 @@ window.generarTempPass=async()=>{
     document.getElementById('temp-pass-result').textContent=`Contraseña temporal: ${temp} (un solo uso)`;
     toast('Contraseña generada.');
   }catch(_){toast('No se encontró ese estudiante.','danger');}
+};
+
+// ── SOLICITUDES ───────────────────────────────────────────────
+async function cargarSolicitudes() {
+  const snap = await getDocs(collection(db,'profesores'));
+  const pendientes = [], aprobados = [];
+  snap.forEach(d => {
+    const p = {...d.data(), uid: d.id};
+    if (p.estado === 'pendiente') pendientes.push(p);
+    else if (p.estado === 'aprobado') aprobados.push(p);
+  });
+
+  // Badge en sidebar
+  const badge = document.getElementById('badge-solicitudes');
+  if (badge) {
+    badge.style.display = pendientes.length ? 'inline' : 'none';
+    badge.textContent = pendientes.length;
+  }
+
+  // Lista de pendientes
+  const listEl = document.getElementById('solicitudes-list');
+  if (listEl) {
+    if (!pendientes.length) {
+      listEl.innerHTML = '<div class="empty-state">No hay solicitudes pendientes.</div>';
+    } else {
+      listEl.innerHTML = `<div class="table-wrap"><table>
+        <thead><tr><th>Nombre</th><th>Correo</th><th>Fecha solicitud</th><th>Acciones</th></tr></thead>
+        <tbody>${pendientes.map(p => `<tr>
+          <td>${p.nombre}</td>
+          <td>${p.email}</td>
+          <td style="font-size:11px;color:var(--text2)">${p.creadoEn?.seconds?new Date(p.creadoEn.seconds*1000).toLocaleString('es-CO'):'—'}</td>
+          <td style="display:flex;gap:6px">
+            <button class="btn success sm" onclick="aprobarProfesor('${p.uid}','${p.nombre}','${p.email}')">✓ Aprobar</button>
+            <button class="btn danger sm" onclick="rechazarProfesor('${p.uid}','${p.nombre}')">✗ Rechazar</button>
+          </td>
+        </tr>`).join('')}</tbody>
+      </table></div>`;
+    }
+  }
+
+  // Lista de aprobados
+  const aprobEl = document.getElementById('profesores-list');
+  if (aprobEl) {
+    if (!aprobados.length) {
+      aprobEl.innerHTML = '<div class="empty-state">Sin profesores aprobados aún.</div>';
+    } else {
+      aprobEl.innerHTML = `<div class="table-wrap"><table>
+        <thead><tr><th>Nombre</th><th>Correo</th><th>Rol</th><th></th></tr></thead>
+        <tbody>${aprobados.map(p => `<tr>
+          <td>${p.nombre}</td>
+          <td>${p.email}</td>
+          <td>${p.admin?'<span class="badge badge-purple">Admin</span>':'<span class="badge badge-blue">Profesor</span>'}</td>
+          <td>${!p.admin?`<button class="btn danger sm" onclick="revocarProfesor('${p.uid}','${p.nombre}')">Revocar</button>`:'—'}</td>
+        </tr>`).join('')}</tbody>
+      </table></div>`;
+    }
+  }
+}
+
+window.aprobarProfesor = async (uid, nombre, email) => {
+  if (!confirm(`¿Aprobar acceso a ${nombre}?`)) return;
+  await updateDoc(doc(db,'profesores',uid), { estado:'aprobado', aprobadoEn:serverTimestamp() });
+  toast(`${nombre} aprobado.`); cargarSolicitudes();
+};
+window.rechazarProfesor = async (uid, nombre) => {
+  if (!confirm(`¿Rechazar y eliminar solicitud de ${nombre}?`)) return;
+  await deleteDoc(doc(db,'profesores',uid));
+  // Nota: la cuenta en Firebase Auth sigue existiendo pero sin doc en Firestore no puede acceder
+  toast(`Solicitud de ${nombre} rechazada.`); cargarSolicitudes();
+};
+window.revocarProfesor = async (uid, nombre) => {
+  if (!confirm(`¿Revocar acceso de ${nombre}? No podrá entrar al panel.`)) return;
+  await updateDoc(doc(db,'profesores',uid), { estado:'revocado' });
+  toast(`Acceso de ${nombre} revocado.`); cargarSolicitudes();
 };
 
 // ── UTILS ─────────────────────────────────────────────────────
