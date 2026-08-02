@@ -266,17 +266,18 @@
   .danger-zone{background:rgba(231,76,60,.05);border:1px solid rgba(231,76,60,.2);border-radius:8px;padding:14px;}
   .danger-zone p{font-size:13px;color:var(--text2);margin-bottom:10px;}
 
-  /* Night Owl theme — Sarah Drasner */
+  /* Okaidia theme — Monokai */
 code[class*="language-"],
 pre[class*="language-"] {
-  color: #d6deeb;
+  color: #f8f8f2;
+  background: none;
   font-family: var(--mono);
+  font-size: 13px;
   text-align: left;
   white-space: pre;
   word-spacing: normal;
   word-break: normal;
   line-height: 1.6;
-  font-size: 13px;
   -moz-tab-size: 4;
   -o-tab-size: 4;
   tab-size: 4;
@@ -285,19 +286,16 @@ pre[class*="language-"] {
   -ms-hyphens: none;
   hyphens: none;
 }
-.token.comment,.token.prolog,.token.cdata { color: rgb(99,119,119); font-style: italic; }
-.token.punctuation { color: rgb(199,146,234); }
-.token.deleted { color: rgba(239,83,80,0.56); font-style: italic; }
-.token.symbol,.token.property { color: rgb(128,203,196); }
-.token.tag,.token.operator,.token.keyword { color: rgb(127,219,202); }
-.token.boolean { color: rgb(255,88,116); }
-.token.number { color: rgb(247,140,108); }
-.token.constant,.token.function,.token.builtin,.token.char { color: rgb(130,170,255); }
-.token.selector,.token.doctype { color: rgb(199,146,234); font-style: italic; }
-.token.attr-name,.token.inserted { color: rgb(173,219,103); font-style: italic; }
-.token.string,.token.url,.token.entity { color: rgb(173,219,103); }
-.token.class-name,.token.atrule,.token.attr-value { color: rgb(255,203,139); }
-.token.regex,.token.important,.token.variable { color: rgb(214,222,235); }
+.token.comment,.token.prolog,.token.doctype,.token.cdata { color: #8292a2; }
+.token.punctuation { color: #f8f8f2; }
+.token.namespace { opacity: .7; }
+.token.property,.token.tag,.token.constant,.token.symbol,.token.deleted { color: #f92672; }
+.token.boolean,.token.number { color: #ae81ff; }
+.token.selector,.token.attr-name,.token.string,.token.char,.token.builtin,.token.inserted { color: #a6e22e; }
+.token.operator,.token.entity,.token.url,.token.variable { color: #f8f8f2; }
+.token.atrule,.token.attr-value,.token.function,.token.class-name { color: #e6db74; }
+.token.keyword { color: #66d9ef; }
+.token.regex,.token.important { color: #fd971f; }
 .token.important,.token.bold { font-weight: bold; }
 .token.italic { font-style: italic; }
 </style>
