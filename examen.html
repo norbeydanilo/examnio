@@ -7,7 +7,7 @@
 
 <!-- Prism.js One Dark theme -->
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-okaidia.min.css">
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/line-numbers/prism-line-numbers.min.css">
+
 
 <!-- JetBrains Mono font -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -75,6 +75,30 @@
   }
   .code-dot { width:10px;height:10px;border-radius:50%; }
   .code-lang-label { font-size:11px;color:#666;margin-left:auto;font-family:var(--mono); }
+  /* Números de línea propios (sin plugin Prism) */
+  .code-wrap pre {
+    counter-reset: line-counter;
+    padding: 14px 14px 14px 0 !important;
+  }
+  .code-line {
+    display: flex;
+    line-height: 1.6;
+  }
+  .line-num {
+    display: inline-block;
+    width: 36px;
+    min-width: 36px;
+    padding-right: 12px;
+    text-align: right;
+    color: #555;
+    font-size: 12px;
+    user-select: none;
+    border-right: 1px solid #444;
+    margin-right: 14px;
+    flex-shrink: 0;
+  }
+  .line-code { flex: 1; white-space: pre; }
+
   .code-wrap pre { border-radius:0 !important; border:none !important; margin:0 !important; }
 
   /* STATUS BAR */
@@ -535,7 +559,7 @@ Prism.manual = true;
 <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-javascript.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-sql.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/line-numbers/prism-line-numbers.min.js"></script>
+
 
 <script type="module">
 import { initializeApp }           from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
@@ -863,18 +887,7 @@ function renderQuestion(idx) {
 
   let codigoHtml = '';
   if (q.codigo) {
-    const lang = (q.lenguaje||'java').toLowerCase();
-    const prismLang = { java:'java',python:'python',javascript:'javascript',js:'javascript',sql:'sql',cpp:'cpp',csharp:'csharp' }[lang] || lang;
-    codigoHtml = `
-      <div class="code-wrap">
-        <div class="code-header">
-          <span class="code-dot" style="background:#ff5f57"></span>
-          <span class="code-dot" style="background:#febc2e"></span>
-          <span class="code-dot" style="background:#28c840"></span>
-          <span class="code-lang-label">${q.lenguaje||'Java'}</span>
-        </div>
-        <pre class="line-numbers"><code class="language-${prismLang}">${esc(q.codigo)}</code></pre>
-      </div>`;
+    codigoHtml = renderCodigoConLineas(q.codigo, q.lenguaje||'Java');
   }
 
   document.getElementById('question-area').innerHTML = `
@@ -893,10 +906,7 @@ function renderQuestion(idx) {
       </div>
     </div>`;
 
-  // Activar Prism.js con pequeño delay para asegurar DOM listo
-  if (q.codigo && window.Prism) {
-    setTimeout(() => window.Prism.highlightAll(), 50);
-  }
+
 
   if (answered) lockUI(q, idx);
 }
@@ -1206,18 +1216,7 @@ window.verRetroalimentacion = async () => {
       const typeLabel={unica:'Única',multiple:'Múltiple',verdaderoFalso:'V/F',completar:'Completar',abierto:'Abierta',emparejar:'Emparejar',ordenar:'Ordenar'}[q.tipo]||q.tipo;
 
       let codigoHtml='';
-      if(q.codigo){
-        const lang=(q.lenguaje||'java').toLowerCase();
-        codigoHtml=`<div class="code-wrap" style="margin-bottom:12px">
-          <div class="code-header">
-            <span class="code-dot" style="background:#ff5f57"></span>
-            <span class="code-dot" style="background:#febc2e"></span>
-            <span class="code-dot" style="background:#28c840"></span>
-            <span class="code-lang-label">${q.lenguaje||'Java'}</span>
-          </div>
-          <pre class="line-numbers"><code class="language-${lang}">${esc(q.codigo)}</code></pre>
-        </div>`;
-      }
+      if(q.codigo){ codigoHtml = renderCodigoConLineas(q.codigo, q.lenguaje||'Java'); }
 
       return `<div class="retro-card ${cls}">
         <div class="retro-q-header">
@@ -1244,7 +1243,6 @@ window.verRetroalimentacion = async () => {
 
     showPage('page-retro');
     window.location.hash='retro';
-    if(window.Prism)window.Prism.highlightAll();
   }catch(e){alert('Error: '+e.message);console.error(e);}
 };
 
@@ -1330,6 +1328,43 @@ function showEventAlert(tipo){
   document.getElementById('event-alert').classList.add('visible');
 }
 window.closeEventAlert=()=>document.getElementById('event-alert').classList.remove('visible');
+
+// Renderizar bloque de código con números de línea manuales
+function renderCodigoConLineas(codigo, lenguaje) {
+  const lang = (lenguaje||'java').toLowerCase();
+  const prismLang = {'java':'java','python':'python','javascript':'javascript',
+    'js':'javascript','sql':'sql','cpp':'cpp','csharp':'csharp'}[lang]||lang;
+
+  // Escapar HTML
+  const escaped = codigo
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+  // Resaltar con Prism si está disponible
+  let highlighted = escaped;
+  if (window.Prism && window.Prism.languages[prismLang]) {
+    highlighted = window.Prism.highlight(escaped, window.Prism.languages[prismLang], prismLang);
+  }
+
+  // Dividir por líneas y agregar número manual
+  const lineas = highlighted.split('\n');
+  // Quitar última línea vacía si existe
+  if (lineas[lineas.length-1] === '') lineas.pop();
+
+  const html = lineas.map((linea, i) =>
+    `<span class="code-line"><span class="line-num">${i+1}</span><span class="line-code">${linea}</span></span>`
+  ).join('\n');
+
+  return `<div class="code-wrap">
+    <div class="code-header">
+      <span class="code-dot" style="background:#ff5f57"></span>
+      <span class="code-dot" style="background:#febc2e"></span>
+      <span class="code-dot" style="background:#28c840"></span>
+      <span class="code-lang-label">${lenguaje||'Java'}</span>
+    </div>
+    <pre><code>${html}</code></pre>
+  </div>`;
+}
+
 </script>
 </body>
 </html>
