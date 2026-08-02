@@ -25,9 +25,20 @@
   code[class*="language-"]{font-family:var(--mono)!important;}
   .line-numbers .line-numbers-rows{border-right:1px solid #333!important;background:#161616!important;}
   .line-numbers-rows>span:before{color:#555!important;}
-  /* Fix alineación números de línea */
-  .line-numbers .line-numbers-rows{top:0!important;padding-top:1em!important;}
-  pre.line-numbers{padding-left:3.8em!important;}
+/* Fix definitivo alineación line-numbers */
+  pre.line-numbers {
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+  }
+  .line-numbers .line-numbers-rows {
+    top: 0 !important;
+    border-right: 1px solid #444 !important;
+    padding-top: 1em !important;
+    padding-bottom: 1em !important;
+  }
+  pre[class*="language-"].line-numbers {
+    padding-left: 3.8em !important;
+  }
   .code-wrap{background:var(--code-bg);border:1px solid #333;border-radius:8px;overflow:hidden;margin-bottom:10px;}
   .code-header{background:#161616;border-bottom:1px solid #333;padding:5px 12px;display:flex;align-items:center;gap:7px;}
   .code-dot{width:9px;height:9px;border-radius:50%;}
@@ -1070,12 +1081,18 @@ function calcPregunta(resp,q){
   if(resp===undefined||resp===null||resp==='')return 0;
   switch(q.tipo){
     case 'unica':{ if(typeof resp==='string')return resp===q.correcta?q.puntaje:0; if(typeof resp==='number')return q.opciones&&q.opciones[resp]===q.correcta?q.puntaje:0; return 0; }
-    case 'multiple':{
+    case 'multiple': {
       if(!Array.isArray(resp))return 0;
-      const correctas=q.correctas||[], restar=q.restar!==false;
-      let pts=0; const ppc=q.puntaje/(correctas.length||1);
-      resp.forEach(r=>{ if(correctas.includes(r))pts+=ppc; else if(restar)pts-=ppc; });
-      return Math.max(0,parseFloat(pts.toFixed(2)));
+      const correctas=q.correctas||[];
+      const restar=q.restar!==false;
+      const n_corr=correctas.length||1;
+      const ptsPorOpcion=q.puntaje/n_corr; // cada opción vale puntaje/n_correctas (estándar Moodle)
+      let pts=0;
+      resp.forEach(r=>{
+        if(correctas.includes(r)) pts+=ptsPorOpcion;
+        else if(restar) pts-=ptsPorOpcion;
+      });
+      return Math.max(0,parseFloat(pts.toFixed(4)));
     }
     case 'verdaderoFalso':{ let v=resp; if(v===0)v=false; if(v===1)v=true; return v===q.correcta?q.puntaje:0; }
     case 'emparejar':{ let ok=0;(q.pares||[]).forEach((p,pi)=>{if(resp[pi]===p.derecha||resp[String(pi)]===p.derecha)ok++;});return parseFloat(((ok/(q.pares||[]).length)*q.puntaje).toFixed(2)); }

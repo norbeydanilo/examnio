@@ -43,12 +43,18 @@
   }
   .line-numbers-rows > span:before { color: #555 !important; }
 
-  /* Fix alineación líneas numeradas */
+/* Fix definitivo alineación line-numbers */
+  pre.line-numbers {
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+  }
   .line-numbers .line-numbers-rows {
     top: 0 !important;
+    border-right: 1px solid #444 !important;
     padding-top: 1em !important;
+    padding-bottom: 1em !important;
   }
-  pre.line-numbers {
+  pre[class*="language-"].line-numbers {
     padding-left: 3.8em !important;
   }
 
@@ -1090,14 +1096,15 @@ function calcPuntajeLocal(resp,q){
     case 'multiple':{
       if(!Array.isArray(resp))return 0;
       const correctas=q.correctas||[];
-      const restar=q.restar!==false; // por defecto sí resta
+      const restar=q.restar!==false;
+      const n_corr=correctas.length||1;
+      const ptsPorOpcion=q.puntaje/n_corr; // estándar Moodle: puntaje/n_correctas
       let pts=0;
-      const ptsPorCorrecta=q.puntaje/(correctas.length||1);
       resp.forEach(r=>{
-        if(correctas.includes(r)) pts+=ptsPorCorrecta;
-        else if(restar) pts-=ptsPorCorrecta;
+        if(correctas.includes(r)) pts+=ptsPorOpcion;
+        else if(restar) pts-=ptsPorOpcion;
       });
-      return Math.max(0,parseFloat(pts.toFixed(2)));
+      return Math.max(0,parseFloat(pts.toFixed(4)));
     }
     case 'verdaderoFalso':{let v=resp;if(v===0)v=false;if(v===1)v=true;return v===q.correcta?q.puntaje:0;}
     case 'emparejar':{let ok=0;(q.pares||[]).forEach((p,pi)=>{if(resp[pi]===p.derecha||resp[String(pi)]===p.derecha)ok++;});return parseFloat(((ok/(q.pares||[]).length)*q.puntaje).toFixed(2));}
