@@ -5,7 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Examnio — Panel</title>
 
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism-themes/1.9.0/prism-vsc-dark-plus.min.css">
 
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 
@@ -264,6 +263,47 @@
   #refresh-label{font-size:10px;color:var(--text2);}
   .danger-zone{background:rgba(231,76,60,.05);border:1px solid rgba(231,76,60,.2);border-radius:8px;padding:14px;}
   .danger-zone p{font-size:13px;color:var(--text2);margin-bottom:10px;}
+
+  /* VSCode Dark+ theme incrustado */
+pre[class*="language-"],
+code[class*="language-"] {
+	color: #d4d4d4;
+	font-size: 13px;
+	text-shadow: none;
+	font-family: var(--mono);
+	direction: ltr;
+	text-align: left;
+	white-space: pre;
+	word-spacing: normal;
+	word-break: normal;
+	line-height: 1.6;
+	-moz-tab-size: 4;
+	-o-tab-size: 4;
+	tab-size: 4;
+	-webkit-hyphens: none;
+	-moz-hyphens: none;
+	-ms-hyphens: none;
+	hyphens: none;
+}
+.token.comment,.token.prolog { color: #6a9955; }
+.token.punctuation { color: #d4d4d4; }
+.token.property,.token.tag,.token.boolean,.token.number,.token.constant,.token.symbol,.token.inserted,.token.unit { color: #b5cea8; }
+.token.selector,.token.attr-name,.token.string,.token.char,.token.builtin,.token.deleted { color: #ce9178; }
+.token.operator,.token.entity { color: #d4d4d4; }
+.token.keyword { color: #569CD6; }
+.token.keyword.module,.token.keyword.control-flow { color: #c586c0; }
+.token.function,.token.function .token.maybe-class-name { color: #dcdcaa; }
+.token.regex { color: #d16969; }
+.token.class-name,.token.maybe-class-name { color: #4ec9b0; }
+.token.boolean { color: #569cd6; }
+.token.property,.token.variable { color: #9cdcfe; }
+.token.parameter,.token.console,.token.interpolation { color: #9cdcfe; }
+.token.constant { color: #9cdcfe; }
+.token.attr-name { color: #9cdcfe; }
+.token.attr-value,.token.attr-value .token.punctuation { color: #ce9178; }
+.token.namespace { color: #4ec9b0; }
+.token.important { color: #569cd6; }
+.token.italic { font-style: italic; }
 </style>
 </head>
 <body>
