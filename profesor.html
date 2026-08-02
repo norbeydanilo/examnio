@@ -685,6 +685,9 @@ window.doLogin = async () => {
   const email=v('auth-email'), pass=document.getElementById('auth-pass').value;
   const err=document.getElementById('auth-error');
   err.style.display='none';
+  const emailRx = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if(!email||!pass){ err.textContent='Completa todos los campos.'; err.style.display='block'; return; }
+  if(!emailRx.test(email)){ err.textContent='Ingresa un correo electrónico válido.'; err.style.display='block'; return; }
   try{ await signInWithEmailAndPassword(auth,email,pass); }
   catch(e){ err.textContent=tradAuth(e.code); err.style.display='block'; }
 };
@@ -694,10 +697,23 @@ window.doRegister = async () => {
   const err=document.getElementById('auth-error');
   err.style.display='none';
   if(!nombre||!email||!pass){ err.textContent='Completa todos los campos.'; err.style.display='block'; return; }
+  // Validar formato de correo
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if(!emailRegex.test(email)){ err.textContent='Ingresa un correo electrónico válido.'; err.style.display='block'; return; }
+  // Validar contraseña mínimo 6 caracteres (requerido por Firebase Auth)
+  if(pass.length < 6){ err.textContent='La contraseña debe tener al menos 6 caracteres.'; err.style.display='block'; return; }
   try {
-    // Verificar si ya existe un admin (primer registro = admin automático)
-    const adminSnap = await getDocs(collection(db,'profesores'));
-    const esElPrimero = adminSnap.empty;
+    // Verificar si ya existe un admin usando un doc centinela público
+    // Esto evita necesitar leer toda la colección (permisos)
+    const centinelaRef = doc(db,'_meta','adminExiste');
+    let esElPrimero = false;
+    try {
+      const centinelaSnap = await getDoc(centinelaRef);
+      esElPrimero = !centinelaSnap.exists();
+    } catch(_) {
+      // Si no se puede leer, asumir que ya hay admin (más seguro)
+      esElPrimero = false;
+    }
 
     // Crear cuenta en Firebase Auth
     const cred = await createUserWithEmailAndPassword(auth, email, pass);
@@ -709,6 +725,8 @@ window.doRegister = async () => {
         nombre, email, estado: 'aprobado', admin: true,
         creadoEn: serverTimestamp(), aprobadoEn: serverTimestamp(),
       });
+      // Crear centinela para futuros registros
+      await setDoc(doc(db,'_meta','adminExiste'), { creadoEn: serverTimestamp() });
       toast('Cuenta creada. Bienvenido, administrador.');
     } else {
       // Registro posterior: queda pendiente

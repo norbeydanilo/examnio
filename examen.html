@@ -725,6 +725,10 @@ window.doLoginNuevo = async () => {
   if (!nombre||!correo||!codigo||!exCod||!pass) {
     errEl.textContent='Completa todos los campos.'; errEl.style.display='block'; return;
   }
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(correo)) {
+    errEl.textContent='Ingresa un correo electrónico válido.'; errEl.style.display='block'; return;
+  }
   if (pass.length < 4) {
     errEl.textContent='La contraseña debe tener al menos 4 caracteres.'; errEl.style.display='block'; return;
   }
@@ -748,6 +752,10 @@ window.doLoginContinuar = async () => {
   errEl.style.display = 'none';
   if (!codigo||!exCod||!pass) {
     errEl.textContent='Completa todos los campos.'; errEl.style.display='block'; return;
+  }
+  if (pass.length < 4) {
+    errEl.textContent='La contraseña debe tener al menos 4 caracteres.';
+    errEl.style.display='block'; return;
   }
   btn.disabled=true; btn.innerHTML='<span class="spinner"></span>';
   try {
