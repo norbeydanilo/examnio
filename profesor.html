@@ -50,11 +50,12 @@
   }
   .code-line {
     display: flex;
-    line-height: 1.55;
+    line-height: 1.5;
+    min-height: 1.5em;
   }
-  .code-line[style*="height:0.5em"] {
-    line-height: 0.5em;
+  .code-line[style*="height:0.6em"] {
     min-height: 0;
+    line-height: 1;
   }
   .line-num {
     display: inline-block;
@@ -1398,11 +1399,19 @@ function renderCodigoConLineas(codigo, lenguaje) {
   const prismLang = {'java':'java','python':'python','javascript':'javascript',
     'js':'javascript','sql':'sql','cpp':'cpp','csharp':'csharp'}[lang]||lang;
 
+  // Desescapar por si el código vino con entidades HTML del JSON
+  const codigoLimpio = codigo
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&amp;/g, '&')
+    .replace(/&quot;/g, '"');
+
+  // Resaltar con Prism (recibe código limpio, devuelve HTML con spans)
   let highlighted;
   if (window.Prism && window.Prism.languages[prismLang]) {
-    highlighted = window.Prism.highlight(codigo, window.Prism.languages[prismLang], prismLang);
+    highlighted = window.Prism.highlight(codigoLimpio, window.Prism.languages[prismLang], prismLang);
   } else {
-    highlighted = codigo.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    highlighted = codigoLimpio.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   }
 
   const lineas = highlighted.split('\n');
@@ -1410,8 +1419,7 @@ function renderCodigoConLineas(codigo, lenguaje) {
 
   const html = lineas.map((linea, i) => {
     const esVacia = linea.trim() === '';
-    // Líneas vacías tienen altura reducida
-    const style = esVacia ? ' style="height:0.5em"' : '';
+    const style = esVacia ? ' style="height:0.6em"' : '';
     return `<span class="code-line"${style}><span class="line-num">${i+1}</span><span class="line-code">${linea||''}</span></span>`;
   }).join('\n');
 
