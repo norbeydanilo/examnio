@@ -366,6 +366,7 @@
             <select id="cal-examen" style="flex:1;min-width:180px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:8px 11px;font-family:var(--font);outline:none;"><option value="">— selecciona —</option></select>
             <button class="btn" onclick="loadCalificacion()">Cargar</button>
             <button class="btn secondary" onclick="descargarExcel()" id="btn-excel" style="display:none">⬇ Excel</button>
+            <button class="btn warning" onclick="recalcularTodos()" id="btn-recalcular" style="display:none">🔄 Recalcular y guardar todas las notas</button>
           </div>
           <div class="card-body" style="padding-top:0;" id="cal-filters-wrap" style="display:none">
             <div class="monitor-filters" id="cal-filters" style="display:none">
@@ -887,6 +888,7 @@ window.loadCalificacion=async()=>{
   const students=[]; snap.forEach(d=>students.push({id:d.id,...d.data()}));
   CAL={examenId:exId,examen,estudiantes:students};
   document.getElementById('btn-excel').style.display=students.length?'block':'none';
+  document.getElementById('btn-recalcular').style.display=students.length?'block':'none';
   document.getElementById('cal-filters').style.display=students.length?'flex':'none';
   renderCalificacion();
 };
@@ -1081,6 +1083,57 @@ function calcPregunta(resp,q){
     default:return 0;
   }
 }
+
+// ── RECALCULAR TODOS ──────────────────────────────────────────
+window.recalcularTodos = async () => {
+  const {examenId, examen, estudiantes} = CAL;
+  if (!estudiantes.length) { toast('No hay estudiantes.', 'warning'); return; }
+  if (!confirm(`¿Recalcular y guardar la nota de los ${estudiantes.length} estudiante(s) usando el JSON actual del examen? Esto sobrescribe las notas guardadas.`)) return;
+
+  const preguntas = examen.preguntas || [];
+  const esc       = examen.escala || { notaMin:0, notaMax:50, notaApro:30 };
+  const ptsTotal  = preguntas.reduce((s,q) => s + q.puntaje, 0);
+
+  let actualizados = 0, errores = 0;
+  const btn = document.getElementById('btn-recalcular');
+  btn.disabled = true;
+  btn.textContent = '⏳ Recalculando...';
+
+  for (const s of estudiantes) {
+    try {
+      const mapa = buildRespMap(s, preguntas);
+
+      // Recalcular puntaje automático con el JSON actual
+      let autoScore = 0;
+      mapa.forEach(({ pregunta: q, respuesta: r }) => {
+        if (q && q.autoCalificable) autoScore += calcPregunta(r, q);
+      });
+
+      // Mantener calificaciones manuales existentes
+      const manual = s.calificacionManual || {};
+      let manScore  = Object.values(manual).reduce((a,b) => a + b, 0);
+      const totalPts = autoScore + manScore;
+      const notaFinal = Math.min(calcNota(totalPts, ptsTotal, esc), esc.notaMax);
+
+      await updateDoc(doc(db,'respuestas',examenId,'estudiantes',s.id), {
+        puntajeTotal:  parseFloat(totalPts.toFixed(2)),
+        calificacion:  notaFinal,
+      });
+      actualizados++;
+    } catch(e) {
+      console.error(`Error con ${s.nombre}:`, e);
+      errores++;
+    }
+  }
+
+  btn.disabled = false;
+  btn.textContent = '🔄 Recalcular y guardar todas las notas';
+
+  toast(`✓ ${actualizados} nota(s) actualizadas${errores ? ` · ${errores} error(es)` : ''}.`);
+
+  // Recargar vista
+  await loadCalificacion();
+};
 
 // ── EXCEL ─────────────────────────────────────────────────────
 window.descargarExcel=()=>{
