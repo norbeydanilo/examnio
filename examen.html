@@ -973,6 +973,7 @@ function renderQuestion(idx) {
 
 // ── RENDER UI POR TIPO ────────────────────────────────────────
 function stripLetra(s){ return s.replace(/^[A-Da-d][).\s]+/,'').trim(); }
+function renderTexto(s){ return stripLetra(s).replace(/\n/g,'<br>'); }
 
 function renderAnswerUI(q, idx) {
   switch(q.tipo) {
@@ -980,12 +981,12 @@ function renderAnswerUI(q, idx) {
       return '<ul class="options-list">'+q.opciones.map((op,oi)=>
         `<li class="option-item" id="opt-${idx}-${oi}" onclick="selOpt(${idx},${oi},false)">
           <div class="option-marker">${String.fromCharCode(65+oi)}</div>
-          <span class="option-text">${stripLetra(op)}</span></li>`).join('')+'</ul>';
+          <span class="option-text">${renderTexto(op)}</span></li>`).join('')+'</ul>';
     case 'multiple':
       return '<ul class="options-list">'+q.opciones.map((op,oi)=>
         `<li class="option-item option-multiple" id="opt-${idx}-${oi}" onclick="selOpt(${idx},${oi},true)">
           <div class="option-marker">✓</div>
-          <span class="option-text">${stripLetra(op)}</span></li>`).join('')+'</ul>';
+          <span class="option-text">${renderTexto(op)}</span></li>`).join('')+'</ul>';
     case 'verdaderoFalso':
       return `<div class="tf-group">
         <button class="tf-btn" id="tf-${idx}-true" onclick="selTF(${idx},true)">✔ Verdadero</button>
@@ -1162,7 +1163,10 @@ window.finishExam = async (forced=false) => {
 function calcPuntajeLocal(resp,q){
   if(resp===undefined||resp===null||resp==='')return 0;
   switch(q.tipo){
-    case 'unica':return resp===q.correcta?q.puntaje:0;
+    case 'unica':{
+      const norm=s=>String(s).replace(/\n/g,' / ').replace(/\s*\/\s*/g,' / ').trim();
+      return norm(resp)===norm(q.correcta)?q.puntaje:0;
+    }
     case 'multiple':{
       if(!Array.isArray(resp))return 0;
       const correctas=q.correctas||[];
@@ -1317,7 +1321,7 @@ function fmtRespRetro(resp,q){
 }
 function fmtCorrectaRetro(q){
   switch(q.tipo){
-    case 'unica':return q.correcta||'—';
+    case 'unica':return (q.correcta||'—').replace(/\n/g,'<br>');
     case 'multiple':return (q.correctas||[]).join('<br>');
     case 'verdaderoFalso':return q.correcta?'Verdadero':'Falso';
     case 'emparejar':return (q.pares||[]).map(p=>p.izquierda+' → '+p.derecha).join('<br>');

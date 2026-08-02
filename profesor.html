@@ -1170,7 +1170,14 @@ function calcNota(pts,total,esc){ if(!total)return esc.notaMin; return Math.min(
 function calcPregunta(resp,q){
   if(resp===undefined||resp===null||resp==='')return 0;
   switch(q.tipo){
-    case 'unica':{ if(typeof resp==='string')return resp===q.correcta?q.puntaje:0; if(typeof resp==='number')return q.opciones&&q.opciones[resp]===q.correcta?q.puntaje:0; return 0; }
+    case 'unica':{
+      // Normalizar: 
+ y " / " se consideran equivalentes para compatibilidad
+      const norm = s => String(s).replace(/\n/g,' / ').replace(/\s*\/\s*/g,' / ').trim();
+      if(typeof resp==='string') return norm(resp)===norm(q.correcta)?q.puntaje:0;
+      if(typeof resp==='number') return q.opciones&&norm(q.opciones[resp])===norm(q.correcta)?q.puntaje:0;
+      return 0;
+    }
     case 'multiple': {
       if(!Array.isArray(resp))return 0;
       const correctas=q.correctas||[];
