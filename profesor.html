@@ -481,9 +481,10 @@ const auth  = getAuth(fbApp);
 const db    = getFirestore(fbApp);
 
 // EmailJS
-const EMAILJS_SERVICE  = 'service_ho3a6su';
-const EMAILJS_TEMPLATE = 'template_qinj95m';
-const EMAILJS_KEY      = 'eUxqvkBt-ic5Cbxao';
+const EMAILJS_SERVICE           = 'service_ho3a6su';
+const EMAILJS_TEMPLATE_SOLICITUD = 'template_qinj95m'; // A ti cuando alguien se registra
+const EMAILJS_TEMPLATE_APROBADO  = 'template_7xrt3wg'; // Al profesor cuando es aprobado
+const EMAILJS_KEY               = 'eUxqvkBt-ic5Cbxao';
 
 let GRUPOS={}, EXAMENES={}, monUnsub=null, currentTab='tab-grupos';
 let monFilter='todos', calFilter='todos';
@@ -587,7 +588,7 @@ window.doRegister = async () => {
       // Notificar por EmailJS
       try {
         if (window.emailjs) {
-          await window.emailjs.send(EMAILJS_SERVICE, EMAILJS_TEMPLATE, {
+          await window.emailjs.send(EMAILJS_SERVICE, EMAILJS_TEMPLATE_SOLICITUD, {
             nombre, correo: email,
             fecha: new Date().toLocaleString('es-CO'),
           });
@@ -1168,7 +1169,27 @@ async function cargarSolicitudes() {
 window.aprobarProfesor = async (uid, nombre, email) => {
   if (!confirm(`¿Aprobar acceso a ${nombre}?`)) return;
   await updateDoc(doc(db,'profesores',uid), { estado:'aprobado', aprobadoEn:serverTimestamp() });
-  toast(`${nombre} aprobado.`); cargarSolicitudes();
+
+  // Notificar al profesor aprobado por email
+  // Crea en EmailJS una plantilla para notificar al profesor
+  // con variables: {{nombre_profesor}}, {{email_profesor}}
+  // y configura el "To email" como {{email_profesor}}
+  try {
+    if (window.emailjs) {
+      await window.emailjs.send(EMAILJS_SERVICE, EMAILJS_TEMPLATE_APROBADO, {
+        to_name:  nombre,
+        to_email: email,
+        fecha:    new Date().toLocaleString('es-CO'),
+      });
+      toast(`${nombre} aprobado y notificado por email.`);
+    } else {
+      toast(`${nombre} aprobado.`);
+    }
+  } catch(mailErr) {
+    console.warn('Email de aprobación no enviado:', mailErr);
+    toast(`${nombre} aprobado. (Email no enviado)`);
+  }
+  cargarSolicitudes();
 };
 window.rechazarProfesor = async (uid, nombre) => {
   if (!confirm(`¿Rechazar y eliminar solicitud de ${nombre}?`)) return;

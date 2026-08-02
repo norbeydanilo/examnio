@@ -351,8 +351,8 @@
         </button>
         <button class="landing-btn" onclick="goTo('continuar')">
           <span class="btn-icon">▶️</span>
-          <span class="btn-label">Continuar examen</span>
-          <span class="btn-desc">Ya iniciaste antes</span>
+          <span class="btn-label">Continuar / Ver resultados</span>
+          <span class="btn-desc">Ya iniciaste · Ver retroalimentación</span>
         </button>
       </div>
       <p style="text-align:center;font-size:12px;color:var(--text2)">¿Eres profesor? <a href="profesor.html" style="color:var(--accent)">Ir al panel</a></p>
@@ -404,8 +404,8 @@
   <div class="center-wrap">
     <div class="login-card">
       <span class="back-link" onclick="goTo('landing')">← Volver</span>
-      <h1>Continuar examen</h1>
-      <p style="color:var(--text2);font-size:13px;margin-bottom:24px">Ya iniciaste este examen anteriormente</p>
+      <h1>Continuar / Ver resultados</h1>
+      <p style="color:var(--text2);font-size:13px;margin-bottom:24px">Ingresa tus datos para continuar tu examen o ver tu retroalimentación</p>
 
       <div class="field">
         <label>Código estudiantil</label>
@@ -673,14 +673,14 @@ async function iniciarSesion({ nombre, correo, codigo, exCod, pass, esNuevo }) {
   // Para continuar necesitamos buscar por código — el nombre lo sacamos de Firebase
   let respDocId;
   if (esNuevo) {
-    if (!exData.activo) throw new Error('Este examen no está activo aún. Espera al profesor.');
+    if (!exData.activo && esNuevo) throw new Error('Este examen no está activo aún. Espera al profesor.');
     S.estudiante = { nombre, correo, codigo };
     respDocId    = `${codigo}-${nombre.replace(/\s+/g,'-').toLowerCase()}`;
   } else {
     // Para continuar: buscar el doc por código en Firebase
     const snap = await getDoc(doc(db,'examenes',exCod));
     if (!snap.data().activo && !snap.data().retroAlimentacionVisible) {
-      throw new Error('Este examen no está activo.');
+      throw new Error('La retroalimentación de este examen no está disponible aún. El profesor la habilitará cuando lo considere.');
     }
     // El respDocId se construye con el nombre guardado en Firebase
     // Primero intentar con localStorage para obtener el respDocId
