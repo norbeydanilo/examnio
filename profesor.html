@@ -439,6 +439,23 @@
   </div>
 </div>
 
+<!-- MODAL EDITAR JSON -->
+<div id="modal-editar-json" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:500;align-items:center;justify-content:center;">
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:28px;width:90%;max-width:700px;max-height:90vh;display:flex;flex-direction:column;gap:14px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;">
+      <h3 style="font-size:15px">Editar preguntas — <span id="edit-json-id" style="color:var(--accent)"></span></h3>
+      <button onclick="cerrarEditarJSON()" style="background:none;border:none;color:var(--text2);cursor:pointer;font-size:20px;padding:0">✕</button>
+    </div>
+    <p style="font-size:12px;color:var(--text2)">Edita el JSON de preguntas. Los cambios aplican a nuevos intentos.</p>
+    <textarea id="edit-json-textarea" style="flex:1;min-height:340px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:var(--mono);font-size:12px;padding:12px;outline:none;resize:vertical;"></textarea>
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+      <button class="btn secondary" onclick="validarEditJSON()">Validar JSON</button>
+      <button class="btn" onclick="guardarEditJSON()">Guardar cambios</button>
+      <span id="edit-json-status" style="font-size:11px;color:var(--text2)"></span>
+    </div>
+  </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
 <script>
   // Inicializar EmailJS (debe ser antes del módulo ES)
@@ -698,7 +715,8 @@ function renderExamenesList(){
         <td><label class="toggle-wrap"><label class="toggle"><input type="checkbox" ${ex.activo?'checked':''} onchange="toggleActivo('${k}',this.checked)"><span class="toggle-slider"></span></label><span style="font-size:11px">${ex.activo?'Activo':'Inactivo'}</span></label></td>
         <td><label class="toggle-wrap"><label class="toggle"><input type="checkbox" ${ex.retroAlimentacionVisible?'checked':''} onchange="toggleRetro('${k}',this.checked)"><span class="toggle-slider"></span></label><span style="font-size:11px">${ex.retroAlimentacionVisible?'Visible':'Oculta'}</span></label></td>
         <td style="display:flex;gap:5px;flex-wrap:wrap">
-          <button class="btn secondary sm" onclick="verJSON('${k}')">JSON</button>
+          <button class="btn secondary sm" onclick="verJSON('${k}')">Ver JSON</button>
+          <button class="btn warning sm" onclick="editarJSON('${k}')">Editar JSON</button>
           <button class="btn danger sm" onclick="eliminarExamen('${k}')">Eliminar</button>
         </td></tr>`;
     }).join('')
@@ -727,8 +745,23 @@ window.crearExamen=async()=>{
   document.getElementById('json-status').textContent='';
   toast('Examen creado: '+id); await loadExamenes(); fillExamenSelects();
 };
-window.toggleActivo=async(id,val)=>{await updateDoc(doc(db,'examenes',id),{activo:val});EXAMENES[id].activo=val;toast(val?`"${id}" activado.`:`"${id}" desactivado.`);};
-window.toggleRetro=async(id,val)=>{await updateDoc(doc(db,'examenes',id),{retroAlimentacionVisible:val});toast(val?'Retroalimentación visible.':'Retroalimentación oculta.');};
+window.toggleActivo=async(id,val)=>{
+  await updateDoc(doc(db,'examenes',id),{activo:val});
+  EXAMENES[id].activo=val;
+  // Actualizar etiqueta en el DOM sin recargar
+  const toggle=event.target;
+  const label=toggle.closest('.toggle-wrap').querySelector('span');
+  if(label) label.textContent=val?'Activo':'Inactivo';
+  toast(val?`"${id}" activado.`:`"${id}" desactivado.`);
+};
+window.toggleRetro=async(id,val)=>{
+  await updateDoc(doc(db,'examenes',id),{retroAlimentacionVisible:val});
+  // Actualizar etiqueta en el DOM sin recargar
+  const toggle=event.target;
+  const label=toggle.closest('.toggle-wrap').querySelector('span');
+  if(label) label.textContent=val?'Visible':'Oculta';
+  toast(val?'Retroalimentación visible.':'Retroalimentación oculta.');
+};
 window.eliminarExamen=async(id)=>{if(!confirm(`¿Eliminar "${id}"?`))return;await deleteDoc(doc(db,'examenes',id));clearMonitor();await loadExamenes();fillExamenSelects();toast('Examen eliminado.');};
 window.verJSON=id=>{const w=window.open('','_blank');w.document.write(`<pre style="background:#0f1117;color:#c9d1d9;padding:20px;font-size:12px;font-family:monospace">${JSON.stringify(EXAMENES[id].preguntas,null,2)}</pre>`);};
 window.validarJSON=()=>{
@@ -1201,6 +1234,57 @@ window.revocarProfesor = async (uid, nombre) => {
   if (!confirm(`¿Revocar acceso de ${nombre}? No podrá entrar al panel.`)) return;
   await updateDoc(doc(db,'profesores',uid), { estado:'revocado' });
   toast(`Acceso de ${nombre} revocado.`); cargarSolicitudes();
+};
+
+// ── EDITAR JSON ───────────────────────────────────────────────
+let editandoExamenId = null;
+
+window.editarJSON = (id) => {
+  editandoExamenId = id;
+  document.getElementById('edit-json-id').textContent = id;
+  document.getElementById('edit-json-textarea').value =
+    JSON.stringify(EXAMENES[id].preguntas || [], null, 2);
+  document.getElementById('edit-json-status').textContent = '';
+  document.getElementById('modal-editar-json').style.display = 'flex';
+};
+
+window.cerrarEditarJSON = () => {
+  document.getElementById('modal-editar-json').style.display = 'none';
+  editandoExamenId = null;
+};
+
+window.validarEditJSON = () => {
+  const st = document.getElementById('edit-json-status');
+  try {
+    const a = JSON.parse(document.getElementById('edit-json-textarea').value);
+    if (!Array.isArray(a)) throw new Error('Debe ser un array.');
+    const pts = a.reduce((s,q) => s + (q.puntaje||0), 0);
+    st.textContent = `✅ Válido — ${a.length} preguntas, ${pts} pts`;
+    st.style.color = 'var(--success)';
+  } catch(e) {
+    st.textContent = '❌ ' + e.message;
+    st.style.color = 'var(--danger)';
+  }
+};
+
+window.guardarEditJSON = async () => {
+  if (!editandoExamenId) return;
+  const st = document.getElementById('edit-json-status');
+  let preguntas;
+  try {
+    preguntas = JSON.parse(document.getElementById('edit-json-textarea').value);
+    if (!Array.isArray(preguntas)) throw new Error('Debe ser un array.');
+  } catch(e) {
+    st.textContent = '❌ JSON inválido: ' + e.message;
+    st.style.color = 'var(--danger)';
+    return;
+  }
+  if (!confirm(`¿Guardar los cambios en "${editandoExamenId}"? Los nuevos intentos usarán este JSON. Los intentos ya registrados no se recalculan automáticamente.`)) return;
+  await updateDoc(doc(db,'examenes',editandoExamenId), { preguntas });
+  EXAMENES[editandoExamenId].preguntas = preguntas;
+  cerrarEditarJSON();
+  toast('JSON actualizado: ' + editandoExamenId);
+  await loadExamenes(); fillExamenSelects();
 };
 
 // ── UTILS ─────────────────────────────────────────────────────
