@@ -1,0 +1,219 @@
+{
+  "_contexto": {
+    "descripcion": "Plantilla de preguntas para el sistema de exámenes Examnio",
+    "app": {
+      "nombre": "Examnio",
+      "tagline": "Integridad académica en el examen digital",
+      "descripcion": "Sistema de exámenes en línea con detección de comportamiento sospechoso, calificación automática y retroalimentación al estudiante.",
+      "techstack": {
+        "frontend": "HTML + JavaScript vanilla (ES Modules)",
+        "base_de_datos": "Firebase Firestore (tiempo real)",
+        "hosting": "GitHub Pages",
+        "autenticacion_profesor": "Firebase Authentication (email + contraseña)",
+        "autenticacion_estudiante": "Contraseña de sesión hasheada con SHA-256 por examen",
+        "resaltado_codigo": "Prism.js (Night Owl theme) — Java, Python, JavaScript, SQL"
+      },
+      "flujo_estudiante": [
+        "1. Estudiante elige 'Empezar examen' (primera vez) o 'Continuar / Ver resultados' (ya inició)",
+        "2. Ingresa nombre, correo, código estudiantil, código del examen y contraseña de sesión",
+        "3. Las preguntas se muestran UNA POR UNA en orden aleatorio",
+        "4. Las opciones de cada pregunta también se aleatorizan",
+        "5. Al avanzar, la respuesta se guarda y NO se puede cambiar",
+        "6. Al entregar, se calcula el puntaje automático y se muestra la nota",
+        "7. Se muestra retroalimentación con respuesta correcta vs respuesta dada (si el profesor la habilita)"
+      ],
+      "flujo_profesor": [
+        "1. Autenticarse con Firebase Auth (email + contraseña)",
+        "2. Crear grupos (Universidad > Materia > Grupo > Año/Semestre)",
+        "3. Crear examen pegando el JSON de preguntas",
+        "4. Configurar escala de calificación (notaMin, notaMax, notaApro) — defecto: 0/50/30",
+        "5. Configurar tiempo en minutos (0 = sin límite)",
+        "6. Activar el examen con toggle",
+        "7. Monitorear en tiempo real: progreso, eventos sospechosos, tiempo por intento",
+        "8. Calificar preguntas manuales y guardar nota",
+        "9. Recalcular todas las notas con un click si se edita el JSON",
+        "10. Activar retroalimentación para estudiantes",
+        "11. Descargar Excel con resultados"
+      ]
+    },
+    "calificacion": {
+      "formula": "notaFinal = notaMin + (puntosObtenidos / puntosTotal) × (notaMax - notaMin)",
+      "ejemplo_escala_50": "Con escala 0-50 y 34.5 pts totales: obtener 28 pts → nota = 0 + (28/34.5) × 50 = 40.6",
+      "escala_defecto": "notaMin: 0, notaMax: 50, notaApro: 30",
+      "multiple_restar": {
+        "descripcion": "Estándar Moodle para preguntas de selección múltiple",
+        "formula_por_opcion": "puntaje / n_correctas",
+        "ejemplo": "1.5 pts, 3 correctas → cada opción vale 0.5 pts. Marcar 2 correctas + 1 incorrecta = 1.0 - 0.5 = 0.5 pts",
+        "minimo": "Siempre 0, nunca negativo"
+      }
+    },
+    "reglas_del_json": [
+      "El array de preguntas va directo, sin wrapper",
+      "Cada pregunta tiene un id único tipo 'tema-subtema' (ej: 'enc-1', 'her-override')",
+      "El campo 'tipo' determina cómo se renderiza y califica la pregunta",
+      "El campo 'puntaje' es el puntaje máximo de esa pregunta",
+      "El campo 'autoCalificable' indica si el sistema la califica solo (true) o requiere revisión manual (false)",
+      "Las opciones van como TEXTO COMPLETO sin letra prefix — el sistema asigna A/B/C/D según el orden aleatorio",
+      "El campo 'correcta' para tipo unica es el TEXTO EXACTO de la opción correcta",
+      "El campo 'correctas' para tipo multiple es un ARRAY con los TEXTOS EXACTOS de las opciones correctas",
+      "El campo 'restar' en tipo multiple activa la penalización por incorrectas (estándar Moodle: true recomendado)",
+      "Para opciones con salidas de consola multilínea usar \\n como separador (ej: 'Línea1\\nLínea2')",
+      "El campo 'codigo' es opcional: código fuente que se muestra con resaltado Night Owl",
+      "El campo 'imagen' es opcional: URL pública de una imagen",
+      "El campo 'lenguaje' especifica el lenguaje del código (Java, Python, JavaScript, SQL)"
+    ],
+    "tipos_disponibles": {
+      "unica": "Selección única — una sola respuesta correcta",
+      "multiple": "Selección múltiple — varias respuestas correctas, con opción de restar por incorrectas",
+      "verdaderoFalso": "Verdadero o Falso — correcta es boolean true o false",
+      "completar": "Rellenar espacios en blanco — usar ___ en el enunciado, espacios es array con las respuestas en orden",
+      "abierto": "Pregunta abierta — siempre autoCalificable: false, requiere revisión manual del profesor",
+      "emparejar": "Emparejar columnas — pares es array de {izquierda, derecha}",
+      "ordenar": "Ordenar elementos — items es el array desordenado, correctos es el orden correcto"
+    }
+  },
+
+  "_plantilla_preguntas": [
+
+    {
+      "_comentario": "TIPO: unica — Selección única",
+      "id": "tema-1",
+      "tipo": "unica",
+      "enunciado": "Texto de la pregunta aquí. Puede incluir HTML básico como <code>código inline</code>.",
+      "codigo": "// Opcional: bloque de código\npublic class Ejemplo {\n    private String campo;\n}",
+      "lenguaje": "Java",
+      "imagen": "https://usuario.github.io/repo/imgs/diagrama.svg",
+      "opciones": [
+        "Texto de la opción incorrecta 1",
+        "Texto de la opción correcta",
+        "Texto de la opción incorrecta 2",
+        "Texto de la opción incorrecta 3"
+      ],
+      "correcta": "Texto de la opción correcta",
+      "puntaje": 1,
+      "autoCalificable": true
+    },
+
+    {
+      "_comentario": "TIPO: multiple — Selección múltiple con restar (estándar Moodle)",
+      "id": "tema-2",
+      "tipo": "multiple",
+      "enunciado": "Selecciona TODAS las afirmaciones correctas:",
+      "opciones": [
+        "Afirmación correcta A",
+        "Afirmación incorrecta B",
+        "Afirmación correcta C",
+        "Afirmación incorrecta D",
+        "Afirmación correcta E"
+      ],
+      "correctas": [
+        "Afirmación correcta A",
+        "Afirmación correcta C",
+        "Afirmación correcta E"
+      ],
+      "restar": true,
+      "puntaje": 1.5,
+      "autoCalificable": true
+    },
+
+    {
+      "_comentario": "TIPO: verdaderoFalso",
+      "id": "tema-3",
+      "tipo": "verdaderoFalso",
+      "enunciado": "Afirmación que el estudiante debe evaluar como verdadera o falsa.",
+      "correcta": true,
+      "puntaje": 1,
+      "autoCalificable": true
+    },
+
+    {
+      "_comentario": "TIPO: completar — usar ___ para cada espacio en blanco",
+      "id": "tema-4",
+      "tipo": "completar",
+      "enunciado": "El ___ es el principio que permite ___ los datos de una clase mediante modificadores de acceso.",
+      "espacios": ["encapsulamiento", "proteger"],
+      "puntaje": 1.5,
+      "autoCalificable": false
+    },
+
+    {
+      "_comentario": "TIPO: abierto — siempre manual",
+      "id": "tema-5",
+      "tipo": "abierto",
+      "enunciado": "Explica con tus palabras qué es X y por qué es importante en el contexto de Y. Da un ejemplo.",
+      "codigo": "// Opcional: código de referencia si aplica",
+      "lenguaje": "Java",
+      "puntaje": 2,
+      "autoCalificable": false
+    },
+
+    {
+      "_comentario": "TIPO: emparejar — relacionar columna izquierda con columna derecha",
+      "id": "tema-6",
+      "tipo": "emparejar",
+      "enunciado": "Relaciona cada concepto con su descripción correcta:",
+      "pares": [
+        { "izquierda": "Concepto A", "derecha": "Descripción de A" },
+        { "izquierda": "Concepto B", "derecha": "Descripción de B" },
+        { "izquierda": "Concepto C", "derecha": "Descripción de C" }
+      ],
+      "puntaje": 1.5,
+      "autoCalificable": true
+    },
+
+    {
+      "_comentario": "TIPO: ordenar — arrastrar para ordenar correctamente",
+      "id": "tema-7",
+      "tipo": "ordenar",
+      "enunciado": "Ordena los siguientes pasos en el orden correcto:",
+      "items": ["Paso C", "Paso A", "Paso D", "Paso B"],
+      "correctos": ["Paso A", "Paso B", "Paso C", "Paso D"],
+      "puntaje": 1,
+      "autoCalificable": true
+    },
+
+    {
+      "_comentario": "TIPO: unica con salida de consola multilínea (usar \\n en opciones)",
+      "id": "tema-8",
+      "tipo": "unica",
+      "enunciado": "¿Cuál es la salida exacta en consola al ejecutar el siguiente código?",
+      "codigo": "public class Main {\n    public static void main(String[] args) {\n        System.out.println(\"Hola\");\n        System.out.println(\"Mundo\");\n    }\n}",
+      "lenguaje": "Java",
+      "opciones": [
+        "Hola\nMundo",
+        "Hola Mundo",
+        "mundo\nhola",
+        "Error de compilación"
+      ],
+      "correcta": "Hola\nMundo",
+      "puntaje": 1,
+      "autoCalificable": true
+    }
+  ],
+
+  "_guia_de_dificultad": {
+    "recomendaciones": [
+      "Puntaje 1.0: preguntas de definición directa, V/F o memorización básica",
+      "Puntaje 1.5: preguntas conceptuales de comprensión media o múltiple básica",
+      "Puntaje 2.0: análisis de código, múltiple selección con buenos distractores",
+      "Puntaje 2.5: predicción de salida de código o relaciones entre conceptos",
+      "Puntaje 3.0: preguntas integradoras, abiertas o con múltiples conceptos simultáneos"
+    ],
+    "proporcion_sugerida": {
+      "autoCalificables": "70-80% del total de puntos",
+      "manuales": "20-30% del total de puntos",
+      "abiertas_por_examen": "2-3 máximo para no saturar la calificación manual"
+    }
+  },
+
+  "_errores_comunes": [
+    "No poner letra prefix en las opciones (MAL: 'A) texto', BIEN: 'texto')",
+    "El campo 'correcta' debe ser IDÉNTICO al texto de la opción, incluyendo mayúsculas y tildes",
+    "Los campos 'codigo' e 'imagen' son opcionales — no incluir si no aplica",
+    "Las preguntas 'completar' tienen autoCalificable: false porque requieren revisión manual",
+    "Los IDs deben ser únicos en todo el array — usar convención 'tema-numero' (ej: her-1, pol-din-2)",
+    "Las preguntas 'multiple' deben incluir 'restar': true para el estándar Moodle",
+    "Para salidas de consola multilínea usar \\n en lugar de ' / ' como separador",
+    "No incluir los campos '_comentario', '_contexto', '_plantilla_preguntas' ni '_guia' — son solo para esta guía"
+  ]
+}
