@@ -1093,7 +1093,7 @@ function renderCalificacion(){
             ${s.entregado?'<span class="badge badge-green">Entregado</span>':'<span class="badge badge-yellow">En progreso</span>'}
             ${s.entregadoForzado?'<span class="badge badge-yellow">Tiempo agotado</span>':''}
             ${(s.eventos||[]).length?`<span class="badge badge-yellow">⚠ ${s.eventos.length} evento${s.eventos.length!==1?'s':''}</span>`:''}
-            <span style="font-size:11px;color:var(--text2)">Auto: <strong>${autoScore.toFixed(2)}</strong> | Total: <strong id="pts-total-${s.id}">${totalScore.toFixed(2)}</strong>/${ptsTotal} → <strong style="color:var(--accent)" id="nota-calc-${s.id}">${notaAuto}</strong> <span class="badge ${aprueba?'badge-green':'badge-red'}">${aprueba?'Aprueba':'Reprueba'}</span></span>
+            <span style="font-size:11px;color:var(--text2)" id="hdr-resumen-${s.id}">Auto: <strong id="pts-auto-hdr-${s.id}">${autoScore.toFixed(2)}</strong> | Total: <strong id="pts-total-${s.id}">${totalScore.toFixed(2)}</strong>/${ptsTotal} → <strong style="color:var(--accent)" id="nota-calc-${s.id}">${notaAuto}</strong> <span class="badge ${aprueba?'badge-green':'badge-red'}" id="badge-aprueba-${s.id}">${aprueba?'Aprueba':'Reprueba'}</span></span>
           </div>
         </div>
         <button class="btn success sm" onclick="event.stopPropagation();guardarNota('${s.id}')">Guardar nota</button>
@@ -1201,9 +1201,22 @@ window.recalcularNota=(estId)=>{
   if(el(`pts-total2-${estId}`))el(`pts-total2-${estId}`).textContent=total.toFixed(2);
   if(el(`pts-total-${estId}`))el(`pts-total-${estId}`).textContent=total.toFixed(2);
   if(el(`nota-calc-${estId}`))el(`nota-calc-${estId}`).textContent=nota;
-  // Actualizar el input de nota final para que coincida con el calculado
+  // Actualizar el input de nota final
   const notaInp=el(`nota-final-${estId}`);
   if(notaInp) notaInp.value=nota;
+
+  // Actualizar también el header del acordeón
+  if(el(`pts-auto-hdr-${estId}`))el(`pts-auto-hdr-${estId}`).textContent=autoScore.toFixed(2);
+  if(el(`pts-total-${estId}`))el(`pts-total-${estId}`).textContent=total.toFixed(2);
+  if(el(`nota-calc-${estId}`))el(`nota-calc-${estId}`).textContent=nota;
+
+  // Actualizar badge aprueba/reprueba
+  const badgeEl=el(`badge-aprueba-${estId}`);
+  if(badgeEl){
+    const aprueba=parseFloat(nota)>=esc.notaApro;
+    badgeEl.textContent=aprueba?'Aprueba':'Reprueba';
+    badgeEl.className='badge '+(aprueba?'badge-green':'badge-red');
+  }
 };
 
 // ── CALIFICACIÓN AUTO ─────────────────────────────────────────
