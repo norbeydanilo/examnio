@@ -1117,6 +1117,11 @@ function renderCalificacion(){
 
   // Activar Prism.js
   setTimeout(()=>{if(window.Prism)window.Prism.highlightAll();},100);
+
+  // Recalcular todos los headers inmediatamente después de renderizar
+  setTimeout(()=>{
+    filtered.forEach(s => recalcularNota(s.id));
+  }, 50);
 }
 
 window.toggleAcordeon=(estId,header)=>{
