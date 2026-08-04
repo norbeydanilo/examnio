@@ -565,7 +565,7 @@ pre[class*="language-"] {
           <div class="lbl">Nota calculada</div>
         </div>
       </div>
-      <p style="font-size:12px;color:var(--text2);margin-top:8px">La nota final será publicada por el profesor.</p>
+      <p id="finish-estado-msg" style="font-size:12px;color:var(--text2);margin-top:8px">La nota final será publicada por el profesor una vez revise las preguntas manuales.</p>
       <div id="retro-btn-wrap" style="display:none;margin-top:24px;">
         <button class="btn-submit" style="width:auto;padding:12px 28px;" onclick="verRetroalimentacion()">📋 Ver mis resultados</button>
         <p id="retro-btn-nota-msg" style="display:none;margin-top:10px;font-size:12px;color:var(--text2)">ℹ️ La nota final estará disponible cuando el profesor la publique.</p>
@@ -1232,26 +1232,34 @@ function checkRetroDisponible(){
     tieneNota      = data.calificacion!==undefined && data.calificacion!==null;
     actualizar();
 
-    // ── Actualizar nota en page-finish en tiempo real ──────────
-    const esc = S.examenData?.escala || {notaMin:0,notaMax:50,notaApro:30};
+    // ── Actualizar page-finish en tiempo real ──────────────
+    const esc       = S.examenData?.escala || {notaMin:0,notaMax:50,notaApro:30};
+    const preguntas = S.examenData?.preguntas || [];
+    const ptsTotal  = preguntas.reduce((s,q)=>s+(q.puntaje||0),0);
+    const scoreDisp = document.getElementById('score-display');
 
-    // Puntos obtenidos (automáticos)
-    if(data.puntajeTotal!==undefined){
-      const ptsEl=document.getElementById('finish-pts');
-      if(ptsEl) ptsEl.textContent=parseFloat(data.puntajeTotal).toFixed(2);
-    }
+    // Puntos obtenidos
+    const ptsEl = document.getElementById('finish-pts');
+    if(ptsEl && data.puntajeTotal!==undefined)
+      ptsEl.textContent = parseFloat(data.puntajeTotal).toFixed(2);
 
-    // Nota final — solo si el profesor ya la publicó
-    const notaEl     = document.getElementById('finish-nota');
-    const scoreDisp  = document.getElementById('score-display');
+    // Puntos máximos — se setea aquí también para cuando vienen por Continuar
+    const ptsmaxEl = document.getElementById('finish-pts-max');
+    if(ptsmaxEl && ptsTotal > 0)
+      ptsmaxEl.textContent = ptsTotal.toFixed(2);
+
+    // Mostrar score-display si tiene datos
+    if(tieneCalifAuto && scoreDisp) scoreDisp.style.display='flex';
+
+    // Nota final
+    const notaEl = document.getElementById('finish-nota');
     if(tieneNota && notaEl){
       notaEl.textContent = parseFloat(data.calificacion).toFixed(2);
       notaEl.style.color = data.calificacion>=esc.notaApro
         ? 'var(--success)' : 'var(--danger)';
-      // Mostrar si aún no estaba visible
       if(scoreDisp) scoreDisp.style.display='flex';
 
-      // Mostrar badge aprueba/reprueba si no existe ya
+      // Badge aprueba/reprueba
       let apBadge=document.getElementById('finish-aprueba-badge');
       if(!apBadge){
         apBadge=document.createElement('div');
@@ -1261,12 +1269,27 @@ function checkRetroDisponible(){
         if(notaBoxEl) notaBoxEl.appendChild(apBadge);
       }
       const aprueba=data.calificacion>=esc.notaApro;
-      apBadge.textContent       = aprueba?'✓ Aprobado':'✗ Reprobado';
-      apBadge.style.background  = aprueba?'rgba(46,204,113,.15)':'rgba(231,76,60,.15)';
-      apBadge.style.color       = aprueba?'var(--success)':'var(--danger)';
+      apBadge.textContent      = aprueba?'✓ Aprobado':'✗ Reprobado';
+      apBadge.style.background = aprueba?'rgba(46,204,113,.15)':'rgba(231,76,60,.15)';
+      apBadge.style.color      = aprueba?'var(--success)':'var(--danger)';
     } else if(notaEl && !tieneNota){
       notaEl.textContent='—';
       notaEl.style.color='var(--text2)';
+    }
+
+    // ── Mensaje según estado de calificación ───────────────
+    const msgEl = document.getElementById('finish-estado-msg');
+    if(msgEl){
+      if(tieneNota){
+        msgEl.textContent = '✓ Tu examen ha sido revisado y calificado por el profesor.';
+        msgEl.style.color = 'var(--success)';
+      } else if(tieneCalifAuto){
+        msgEl.textContent = 'La nota final será publicada por el profesor una vez revise las preguntas manuales.';
+        msgEl.style.color = 'var(--text2)';
+      } else {
+        msgEl.textContent = 'Tu examen está en revisión.';
+        msgEl.style.color = 'var(--text2)';
+      }
     }
   });
 }
@@ -1352,7 +1375,12 @@ window.verRetroalimentacion = async () => {
               <div class="retro-box-value">${fmtRespRetro(resp,q)||'<em style="color:var(--text2)">Sin respuesta</em>'}</div>
             </div>
             ${esManual
-              ?'<div class="retro-box pending"><div class="retro-box-label">Calificación</div><div class="retro-box-value" style="color:var(--accent2)">El profesor revisará esta respuesta</div></div>'
+              ?(()=>{
+                const manPts=(estudiante.calificacionManual||{})[q.id];
+                if(manPts!==undefined)
+                  return `<div class="retro-box pending"><div class="retro-box-label">Calificación manual</div><div class="retro-box-value"><span style="font-size:18px;font-weight:700;color:var(--accent2)">${manPts.toFixed(2)}</span> / ${q.puntaje} pts</div></div>`;
+                return '<div class="retro-box pending"><div class="retro-box-label">Calificación</div><div class="retro-box-value" style="color:var(--accent2)">Pendiente de revisión por el profesor</div></div>';
+              })()
               :`<div class="retro-box answer"><div class="retro-box-label">Respuesta correcta</div><div class="retro-box-value">${fmtCorrectaRetro(q)}</div></div>`}
           </div>
         </div>
