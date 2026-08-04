@@ -1364,7 +1364,7 @@ window.verRetroalimentacion = async () => {
           <div class="retro-num">${qi+1}</div>
           <span style="font-size:12px;color:var(--text2)">${typeLabel}</span>
           <span class="retro-result-tag">${tag}</span>
-          <span class="retro-pts">${esManual?'?':pts.toFixed(2)} / ${maxPts} pts</span>
+          <span class="retro-pts">${esManual?(((estudiante.calificacionManual||{})[q.id]!==undefined)?((estudiante.calificacionManual||{})[q.id]).toFixed(2)+'✓':'?'):pts.toFixed(2)} / ${maxPts} pts</span>
         </div>
         <div class="retro-body">
           <div class="retro-enunciado">${q.enunciado}</div>
@@ -1384,6 +1384,16 @@ window.verRetroalimentacion = async () => {
               :`<div class="retro-box answer"><div class="retro-box-label">Respuesta correcta</div><div class="retro-box-value">${fmtCorrectaRetro(q)}</div></div>`}
           </div>
         </div>
+        ${q.retroalimentacion ? `
+        <div style="margin-top:10px;background:rgba(79,142,247,.07);border:1px solid rgba(79,142,247,.15);border-radius:8px;padding:10px 14px;">
+          <div style="font-size:10px;text-transform:uppercase;letter-spacing:.4px;color:var(--accent);margin-bottom:4px;font-weight:600">💡 Retroalimentación</div>
+          <div style="font-size:13px;color:var(--text);line-height:1.6">${q.retroalimentacion}</div>
+        </div>` : ''}
+        ${esManual && ((estudiante.calificacionManual||{})[q.id+'_fb']||'') ? `
+        <div style="margin-top:8px;background:rgba(124,92,191,.07);border:1px solid rgba(124,92,191,.2);border-radius:8px;padding:10px 14px;">
+          <div style="font-size:10px;text-transform:uppercase;letter-spacing:.4px;color:var(--accent2);margin-bottom:4px;font-weight:600">✏ Comentario del profesor</div>
+          <div style="font-size:13px;color:var(--text);line-height:1.6">${(estudiante.calificacionManual||{})[q.id+'_fb']}</div>
+        </div>` : ''}
       </div>`;
     }).join('');
 

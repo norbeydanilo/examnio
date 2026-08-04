@@ -1082,6 +1082,8 @@ function renderCalificacion(){
           <div class="cal-resp-box your"><div class="cal-resp-label">Respuesta del estudiante</div><div class="cal-resp-val">${tuResp||'<em style="color:var(--text2)">Sin respuesta</em>'}</div></div>
           ${q.autoCalificable?`<div class="cal-resp-box correct"><div class="cal-resp-label">Respuesta correcta</div><div class="cal-resp-val">${correcta}</div></div>`:''}
         </div>
+        ${q.retroalimentacion?`<div style="margin-top:8px;background:rgba(79,142,247,.07);border:1px solid rgba(79,142,247,.15);border-radius:8px;padding:8px 12px;"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.4px;color:var(--accent);margin-bottom:4px;font-weight:600">💡 Retroalimentación</div><div style="font-size:12px;color:var(--text);line-height:1.5">${q.retroalimentacion}</div></div>`:''}
+        ${!q.autoCalificable?`<div style="margin-top:8px;"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.4px;color:var(--accent2);margin-bottom:4px;font-weight:600">✏ Comentario del profesor</div><textarea class="grade-input" id="fb-${s.id}-${q.id}" placeholder="Escribe tu retroalimentación para el estudiante..." style="width:100%;min-height:60px;padding:8px;font-size:12px;font-family:var(--font);resize:vertical;text-align:left;">${((s.calificacionManual||{})[q.id+'_fb'])||''}</textarea></div>`:''}
       </div>`;
     }).join('');
 
@@ -1164,6 +1166,9 @@ window.guardarNota=async(estId)=>{
   preguntas.filter(q=>!q.autoCalificable).forEach(q=>{
     const inp=document.getElementById(`man-${estId}-${q.id}`);
     if(inp&&inp.value!=='')manual[q.id]=parseFloat(inp.value);
+    // Guardar también el comentario/retroalimentación del profesor
+    const fbInp=document.getElementById(`fb-${estId}-${q.id}`);
+    if(fbInp&&fbInp.value.trim()!=='')manual[q.id+'_fb']=fbInp.value.trim();
   });
   let totalPts=0;
   mapa.forEach(({pregunta:q,respuesta:r})=>{
