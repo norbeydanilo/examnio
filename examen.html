@@ -1197,30 +1197,69 @@ function calcPuntajeLocal(resp,q){
 
 // ── RETROALIMENTACIÓN ─────────────────────────────────────────
 function checkRetroDisponible(){
-  const btnWrap=document.getElementById('retro-btn-wrap');
-  const pendingMsg=document.getElementById('retro-pending-msg');
+  const btnWrap   = document.getElementById('retro-btn-wrap');
+  const pendingMsg= document.getElementById('retro-pending-msg');
   let retroActiva=false, tieneCalifAuto=false, tieneNota=false;
+
   const actualizar=()=>{
     if(tieneCalifAuto||retroActiva){
-      if(btnWrap)btnWrap.style.display='block';
-      if(pendingMsg)pendingMsg.style.display='none';
+      if(btnWrap)    btnWrap.style.display='block';
+      if(pendingMsg) pendingMsg.style.display='none';
       const notaMsg=document.getElementById('retro-btn-nota-msg');
-      if(notaMsg)notaMsg.style.display=tieneNota?'none':'block';
+      if(notaMsg)    notaMsg.style.display=tieneNota?'none':'block';
     }else{
-      if(btnWrap)btnWrap.style.display='none';
-      if(pendingMsg)pendingMsg.style.display='block';
+      if(btnWrap)    btnWrap.style.display='none';
+      if(pendingMsg) pendingMsg.style.display='block';
     }
   };
+
   onSnapshot(doc(db,'examenes',S.examenId),(snap)=>{
     retroActiva=snap.exists()&&snap.data().retroAlimentacionVisible;
     actualizar();
   });
+
   onSnapshot(doc(db,'respuestas',S.examenId,'estudiantes',S.respDocId),(snap)=>{
-    if(snap.exists()){
-      const data=snap.data();
-      tieneCalifAuto=data.puntajeTotal!==undefined&&data.puntajeTotal!==null;
-      tieneNota=data.calificacion!==undefined&&data.calificacion!==null;
-      actualizar();
+    if(!snap.exists()) return;
+    const data=snap.data();
+    tieneCalifAuto = data.puntajeTotal!==undefined && data.puntajeTotal!==null;
+    tieneNota      = data.calificacion!==undefined && data.calificacion!==null;
+    actualizar();
+
+    // ── Actualizar nota en page-finish en tiempo real ──────────
+    const esc = S.examenData?.escala || {notaMin:0,notaMax:50,notaApro:30};
+
+    // Puntos obtenidos (automáticos)
+    if(data.puntajeTotal!==undefined){
+      const ptsEl=document.getElementById('finish-pts');
+      if(ptsEl) ptsEl.textContent=parseFloat(data.puntajeTotal).toFixed(2);
+    }
+
+    // Nota final — solo si el profesor ya la publicó
+    const notaEl     = document.getElementById('finish-nota');
+    const scoreDisp  = document.getElementById('score-display');
+    if(tieneNota && notaEl){
+      notaEl.textContent = parseFloat(data.calificacion).toFixed(2);
+      notaEl.style.color = data.calificacion>=esc.notaApro
+        ? 'var(--success)' : 'var(--danger)';
+      // Mostrar si aún no estaba visible
+      if(scoreDisp) scoreDisp.style.display='flex';
+
+      // Mostrar badge aprueba/reprueba si no existe ya
+      let apBadge=document.getElementById('finish-aprueba-badge');
+      if(!apBadge){
+        apBadge=document.createElement('div');
+        apBadge.id='finish-aprueba-badge';
+        apBadge.style.cssText='margin-top:8px;font-size:14px;font-weight:700;padding:6px 18px;border-radius:20px;display:inline-block;';
+        const notaBoxEl=document.querySelector('.score-box.nota');
+        if(notaBoxEl) notaBoxEl.appendChild(apBadge);
+      }
+      const aprueba=data.calificacion>=esc.notaApro;
+      apBadge.textContent       = aprueba?'✓ Aprobado':'✗ Reprobado';
+      apBadge.style.background  = aprueba?'rgba(46,204,113,.15)':'rgba(231,76,60,.15)';
+      apBadge.style.color       = aprueba?'var(--success)':'var(--danger)';
+    } else if(notaEl && !tieneNota){
+      notaEl.textContent='—';
+      notaEl.style.color='var(--text2)';
     }
   });
 }
