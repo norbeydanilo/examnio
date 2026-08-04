@@ -1074,7 +1074,7 @@ function renderCalificacion(){
           <div class="cal-q-num">${mi+1}</div>
           <span class="badge badge-purple">${typeLabel}</span>
           ${auto!==null?`<span class="auto-grade">${auto.toFixed(2)}/${q.puntaje}</span>`:''}
-          ${!q.autoCalificable?`<input class="grade-input" type="number" min="0" max="${q.puntaje}" step="0.25" id="man-${si}-${q.id}" value="${prevMan!==undefined?prevMan:''}" placeholder="0–${q.puntaje}" oninput="recalcularNota(${si})">`:''}
+          ${!q.autoCalificable?`<input class="grade-input" type="number" min="0" max="${q.puntaje}" step="0.25" id="man-${s.id}-${q.id}" value="${prevMan!==undefined?prevMan:''}" placeholder="0–${q.puntaje}" oninput="recalcularNota('${s.id}')">`:''}
         </div>
         <div class="cal-enunciado">${q.enunciado}</div>
         ${codigoHtml}
@@ -1093,19 +1093,19 @@ function renderCalificacion(){
             ${s.entregado?'<span class="badge badge-green">Entregado</span>':'<span class="badge badge-yellow">En progreso</span>'}
             ${s.entregadoForzado?'<span class="badge badge-yellow">Tiempo agotado</span>':''}
             ${(s.eventos||[]).length?`<span class="badge badge-yellow">⚠ ${s.eventos.length} evento${s.eventos.length!==1?'s':''}</span>`:''}
-            <span style="font-size:11px;color:var(--text2)">Auto: <strong>${autoScore.toFixed(2)}</strong> | Total: <strong id="pts-total-${si}">${totalScore.toFixed(2)}</strong>/${ptsTotal} → <strong style="color:var(--accent)" id="nota-calc-${si}">${notaAuto}</strong> <span class="badge ${aprueba?'badge-green':'badge-red'}">${aprueba?'Aprueba':'Reprueba'}</span></span>
+            <span style="font-size:11px;color:var(--text2)">Auto: <strong>${autoScore.toFixed(2)}</strong> | Total: <strong id="pts-total-${s.id}">${totalScore.toFixed(2)}</strong>/${ptsTotal} → <strong style="color:var(--accent)" id="nota-calc-${s.id}">${notaAuto}</strong> <span class="badge ${aprueba?'badge-green':'badge-red'}">${aprueba?'Aprueba':'Reprueba'}</span></span>
           </div>
         </div>
-        <button class="btn success sm" onclick="event.stopPropagation();guardarNota(${si})">Guardar nota</button>
+        <button class="btn success sm" onclick="event.stopPropagation();guardarNota('${s.id}')">Guardar nota</button>
         <span class="toggle-icon">▼</span>
       </div>
       <div class="cal-student-body" id="body-${s.id}">
         <div class="cal-summary">
-          <div class="cal-sum-item"><div class="cal-sum-val" id="pts-auto-${si}">${autoScore.toFixed(2)}</div><div class="cal-sum-lbl">Pts automáticos</div></div>
-          <div class="cal-sum-item"><div class="cal-sum-val" id="pts-manual-${si}">${manScore.toFixed(2)}</div><div class="cal-sum-lbl">Pts manuales</div></div>
-          <div class="cal-sum-item"><div class="cal-sum-val" id="pts-total2-${si}">${totalScore.toFixed(2)}</div><div class="cal-sum-lbl">Total / ${ptsTotal}</div></div>
+          <div class="cal-sum-item"><div class="cal-sum-val" id="pts-auto-${s.id}">${autoScore.toFixed(2)}</div><div class="cal-sum-lbl">Pts automáticos</div></div>
+          <div class="cal-sum-item"><div class="cal-sum-val" id="pts-manual-${s.id}">${manScore.toFixed(2)}</div><div class="cal-sum-lbl">Pts manuales</div></div>
+          <div class="cal-sum-item"><div class="cal-sum-val" id="pts-total2-${s.id}">${totalScore.toFixed(2)}</div><div class="cal-sum-lbl">Total / ${ptsTotal}</div></div>
           <div class="cal-sum-item">
-            <input class="grade-input" type="number" min="${esc.notaMin}" max="${esc.notaMax}" step="0.1" id="nota-final-${si}" value="${s.calificacion!==null&&s.calificacion!==undefined?s.calificacion:''}" placeholder="${esc.notaMin}–${esc.notaMax}">
+            <input class="grade-input" type="number" min="${esc.notaMin}" max="${esc.notaMax}" step="0.1" id="nota-final-${s.id}" value="${s.calificacion!==null&&s.calificacion!==undefined?s.calificacion:''}" placeholder="${esc.notaMin}–${esc.notaMax}">
             <div class="cal-sum-lbl">Nota final</div>
           </div>
         </div>
@@ -1131,14 +1131,16 @@ window.abrirAcordeon=(estId)=>{
   if(body&&!body.classList.contains('open')){body.classList.add('open');if(header)header.classList.add('open');}
 };
 
-window.guardarNota=async(si)=>{
-  const {examenId,examen,estudiantes}=CAL, s=estudiantes[si];
-  const esc=examen.escala||{notaMin:0,notaMax:5,notaApro:3};
+window.guardarNota=async(estId)=>{
+  const {examenId,examen,estudiantes}=CAL;
+  const s=estudiantes.find(e=>e.id===estId);
+  if(!s){toast('Estudiante no encontrado','danger');return;}
+  const esc=examen.escala||{notaMin:0,notaMax:50,notaApro:30};
   const preguntas=examen.preguntas||[], ptsTotal=preguntas.reduce((sum,q)=>sum+q.puntaje,0);
   const mapa=buildRespMap(s,preguntas);
   const manual={};
   preguntas.filter(q=>!q.autoCalificable).forEach(q=>{
-    const inp=document.getElementById(`man-${si}-${q.id}`);
+    const inp=document.getElementById(`man-${estId}-${q.id}`);
     if(inp&&inp.value!=='')manual[q.id]=parseFloat(inp.value);
   });
   let totalPts=0;
@@ -1147,40 +1149,45 @@ window.guardarNota=async(si)=>{
     if(q.autoCalificable)totalPts+=calcPregunta(r,q);
     else if(manual[q.id]!==undefined)totalPts+=manual[q.id];
   });
-  let notaFinal=parseFloat(document.getElementById(`nota-final-${si}`).value);
+  // Respetar nota manual si fue ingresada
+  const notaInput=document.getElementById(`nota-final-${estId}`);
+  let notaFinal=notaInput&&notaInput.value!==''?parseFloat(notaInput.value):calcNota(totalPts,ptsTotal,esc);
   if(isNaN(notaFinal))notaFinal=calcNota(totalPts,ptsTotal,esc);
-  notaFinal=Math.min(notaFinal,esc.notaMax);
+  notaFinal=parseFloat(Math.min(notaFinal,esc.notaMax).toFixed(2));
   await updateDoc(doc(db,'respuestas',examenId,'estudiantes',s.id),{calificacion:notaFinal,calificacionManual:manual,puntajeTotal:parseFloat(totalPts.toFixed(2))});
-  CAL.estudiantes[si].calificacion=notaFinal; CAL.estudiantes[si].calificacionManual=manual;
+  const idx=estudiantes.findIndex(e=>e.id===estId);
+  if(idx>=0){CAL.estudiantes[idx].calificacion=notaFinal;CAL.estudiantes[idx].calificacionManual=manual;}
 
   // Actualizar UI
   const manTotal=Object.values(manual).reduce((a,b)=>a+b,0);
   const el=(id)=>document.getElementById(id);
-  if(el(`pts-manual-${si}`))el(`pts-manual-${si}`).textContent=manTotal.toFixed(2);
-  if(el(`pts-total2-${si}`))el(`pts-total2-${si}`).textContent=totalPts.toFixed(2);
-  if(el(`pts-total-${si}`))el(`pts-total-${si}`).textContent=totalPts.toFixed(2);
-  if(el(`nota-calc-${si}`))el(`nota-calc-${si}`).textContent=notaFinal.toFixed(2);
+  if(el(`pts-manual-${estId}`))el(`pts-manual-${estId}`).textContent=manTotal.toFixed(2);
+  if(el(`pts-total2-${estId}`))el(`pts-total2-${estId}`).textContent=totalPts.toFixed(2);
+  if(el(`pts-total-${estId}`))el(`pts-total-${estId}`).textContent=totalPts.toFixed(2);
+  if(el(`nota-calc-${estId}`))el(`nota-calc-${estId}`).textContent=notaFinal.toFixed(2);
   toast(`Nota de ${s.nombre}: ${notaFinal}`);
 };
 
-window.recalcularNota=(si)=>{
-  const {examen,estudiantes}=CAL, s=estudiantes[si];
-  const preguntas=examen.preguntas||[], esc=examen.escala||{notaMin:0,notaMax:5,notaApro:3};
+window.recalcularNota=(estId)=>{
+  const {examen,estudiantes}=CAL;
+  const s=estudiantes.find(e=>e.id===estId);
+  if(!s)return;
+  const preguntas=examen.preguntas||[], esc=examen.escala||{notaMin:0,notaMax:50,notaApro:30};
   const ptsTotal=preguntas.reduce((sum,q)=>sum+q.puntaje,0);
   const mapa=buildRespMap(s,preguntas);
   let autoScore=0, manScore=0;
   mapa.forEach(({pregunta:q,respuesta:r})=>{
     if(!q)return;
     if(q.autoCalificable)autoScore+=calcPregunta(r,q);
-    else{const inp=document.getElementById(`man-${si}-${q.id}`);if(inp&&inp.value!=='')manScore+=parseFloat(inp.value)||0;}
+    else{const inp=document.getElementById(`man-${estId}-${q.id}`);if(inp&&inp.value!=='')manScore+=parseFloat(inp.value)||0;}
   });
   const total=autoScore+manScore, nota=calcNota(total,ptsTotal,esc);
   const el=(id)=>document.getElementById(id);
-  if(el(`pts-manual-${si}`))el(`pts-manual-${si}`).textContent=manScore.toFixed(2);
-  if(el(`pts-total2-${si}`))el(`pts-total2-${si}`).textContent=total.toFixed(2);
-  if(el(`pts-total-${si}`))el(`pts-total-${si}`).textContent=total.toFixed(2);
-  if(el(`nota-calc-${si}`))el(`nota-calc-${si}`).textContent=nota;
-  const inp=el(`nota-final-${si}`);if(inp&&inp.value==='')inp.placeholder=nota;
+  if(el(`pts-manual-${estId}`))el(`pts-manual-${estId}`).textContent=manScore.toFixed(2);
+  if(el(`pts-total2-${estId}`))el(`pts-total2-${estId}`).textContent=total.toFixed(2);
+  if(el(`pts-total-${estId}`))el(`pts-total-${estId}`).textContent=total.toFixed(2);
+  if(el(`nota-calc-${estId}`))el(`nota-calc-${estId}`).textContent=nota;
+  const inp=el(`nota-final-${estId}`);if(inp&&inp.value==='')inp.placeholder=nota;
 };
 
 // ── CALIFICACIÓN AUTO ─────────────────────────────────────────
