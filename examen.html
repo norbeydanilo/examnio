@@ -789,14 +789,21 @@ async function iniciarSesion({ nombre, correo, codigo, exCod, pass, esNuevo }) {
     if (!snap.data().activo && !snap.data().retroAlimentacionVisible) {
       throw new Error('La retroalimentación de este examen no está disponible aún. El profesor la habilitará cuando lo considere.');
     }
-    // El respDocId se construye con el nombre guardado en Firebase
-    // Primero intentar con localStorage para obtener el respDocId
+    // Intentar obtener respDocId desde localStorage primero
     const lsKeys = Object.keys(localStorage).filter(k => k.startsWith(`ex_${exCod}_${codigo}-`));
     if (lsKeys.length) {
       respDocId = lsKeys[0].replace(`ex_${exCod}_`, '');
     } else {
-      // Buscar en Firebase por código — necesitamos iterar (limitado pero funcional)
-      throw new Error('No se encontró tu intento. Usa "Empezar examen" si es tu primera vez.');
+      // No está en localStorage — buscar en Firestore por código de estudiante
+      const estudiantesSnap = await getDocs(collection(db, 'respuestas', exCod, 'estudiantes'));
+      let encontrado = null;
+      estudiantesSnap.forEach(d => {
+        if (d.data().codigo === codigo) encontrado = d.id;
+      });
+      if (!encontrado) {
+        throw new Error('No se encontró tu intento. Usa "Empezar examen" si es tu primera vez.');
+      }
+      respDocId = encontrado;
     }
   }
 
