@@ -1074,7 +1074,7 @@ function renderCalificacion(){
           <div class="cal-q-num">${mi+1}</div>
           <span class="badge badge-purple">${typeLabel}</span>
           ${auto!==null?`<span class="auto-grade">${auto.toFixed(2)}/${q.puntaje}</span>`:''}
-          ${!q.autoCalificable?`<input class="grade-input" type="number" min="0" max="${q.puntaje}" step="0.25" id="man-${s.id}-${q.id}" value="${prevMan!==undefined?prevMan:''}" placeholder="0–${q.puntaje}" oninput="recalcularNota('${s.id}')">`:''}
+          ${!q.autoCalificable?`<input class="grade-input" type="number" min="0" max="${q.puntaje}" step="0.25" id="man-${s.id}-${q.id}" value="${prevMan!==undefined?prevMan:''}" placeholder="0–${q.puntaje}" oninput="recalcularNota('${s.id}')" onfocus="recalcularNota('${s.id}')">`:''}
         </div>
         <div class="cal-enunciado">${q.enunciado}</div>
         ${codigoHtml}
@@ -1121,9 +1121,11 @@ function renderCalificacion(){
 
 window.toggleAcordeon=(estId,header)=>{
   const body=document.getElementById('body-'+estId);
-  const isOpen=body.classList.contains('open');
+  const wasOpen=body.classList.contains('open');
   body.classList.toggle('open');
   header.classList.toggle('open');
+  // Al abrir, recalcular para poblar inputs manuales guardados
+  if(!wasOpen) setTimeout(()=>recalcularNota(estId), 50);
 };
 window.abrirAcordeon=(estId)=>{
   const body=document.getElementById('body-'+estId);
@@ -1178,16 +1180,30 @@ window.recalcularNota=(estId)=>{
   let autoScore=0, manScore=0;
   mapa.forEach(({pregunta:q,respuesta:r})=>{
     if(!q)return;
-    if(q.autoCalificable)autoScore+=calcPregunta(r,q);
-    else{const inp=document.getElementById(`man-${estId}-${q.id}`);if(inp&&inp.value!=='')manScore+=parseFloat(inp.value)||0;}
+    if(q.autoCalificable){
+      autoScore+=calcPregunta(r,q);
+    } else {
+      const inp=document.getElementById(`man-${estId}-${q.id}`);
+      if(inp&&inp.value!==''){
+        // Usar valor del input si fue modificado
+        manScore+=parseFloat(inp.value)||0;
+      } else if(s.calificacionManual&&s.calificacionManual[q.id]!==undefined){
+        // Recuperar del Firebase si el input está vacío
+        manScore+=s.calificacionManual[q.id];
+        if(inp)inp.value=s.calificacionManual[q.id];
+      }
+    }
   });
-  const total=autoScore+manScore, nota=calcNota(total,ptsTotal,esc);
+  const total=autoScore+manScore;
+  const nota=calcNota(total,ptsTotal,esc);
   const el=(id)=>document.getElementById(id);
   if(el(`pts-manual-${estId}`))el(`pts-manual-${estId}`).textContent=manScore.toFixed(2);
   if(el(`pts-total2-${estId}`))el(`pts-total2-${estId}`).textContent=total.toFixed(2);
   if(el(`pts-total-${estId}`))el(`pts-total-${estId}`).textContent=total.toFixed(2);
   if(el(`nota-calc-${estId}`))el(`nota-calc-${estId}`).textContent=nota;
-  const inp=el(`nota-final-${estId}`);if(inp&&inp.value==='')inp.placeholder=nota;
+  // Actualizar el input de nota final para que coincida con el calculado
+  const notaInp=el(`nota-final-${estId}`);
+  if(notaInp) notaInp.value=nota;
 };
 
 // ── CALIFICACIÓN AUTO ─────────────────────────────────────────
