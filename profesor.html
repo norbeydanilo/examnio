@@ -1053,7 +1053,7 @@ function renderCalificacion(){
     const mapa=buildRespMap(s,preguntas);
     let autoScore=0; mapa.forEach(({pregunta:q,respuesta:r})=>{if(q&&q.autoCalificable)autoScore+=calcPregunta(r,q);});
     const notaAuto=calcNota(autoScore,ptsTotal,esc), aprueba=notaAuto>=esc.notaApro;
-    const manScore=Object.values(s.calificacionManual||{}).reduce((a,b)=>a+b,0);
+    const manScore=Object.entries(s.calificacionManual||{}).filter(([k])=>!k.endsWith('_fb')).reduce((sum,[,v])=>sum+(parseFloat(v)||0),0);
     const totalScore=autoScore+manScore;
 
     // Preguntas como acordeón interno
@@ -1186,7 +1186,7 @@ window.guardarNota=async(estId)=>{
   if(idx>=0){CAL.estudiantes[idx].calificacion=notaFinal;CAL.estudiantes[idx].calificacionManual=manual;}
 
   // Actualizar UI
-  const manTotal=Object.values(manual).reduce((a,b)=>a+b,0);
+  const manTotal=Object.entries(manual).filter(([k])=>!k.endsWith('_fb')).reduce((s,[,v])=>s+(parseFloat(v)||0),0);
   const el=(id)=>document.getElementById(id);
   if(el(`pts-manual-${estId}`))el(`pts-manual-${estId}`).textContent=manTotal.toFixed(2);
   if(el(`pts-total2-${estId}`))el(`pts-total2-${estId}`).textContent=totalPts.toFixed(2);
@@ -1310,7 +1310,7 @@ window.recalcularTodos = async () => {
 
       // Mantener calificaciones manuales existentes
       const manual = s.calificacionManual || {};
-      let manScore  = Object.values(manual).reduce((a,b) => a + b, 0);
+      let manScore  = Object.entries(manual).filter(([k])=>!k.endsWith('_fb')).reduce((s,[,v])=>s+(parseFloat(v)||0),0);
       const totalPts = autoScore + manScore;
       const notaFinal = Math.min(calcNota(totalPts, ptsTotal, esc), esc.notaMax);
 
