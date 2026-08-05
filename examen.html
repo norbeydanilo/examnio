@@ -1198,6 +1198,24 @@ function calcPuntajeLocal(resp,q){
     case 'verdaderoFalso':{let v=resp;if(v===0)v=false;if(v===1)v=true;return v===q.correcta?q.puntaje:0;}
     case 'emparejar':{let ok=0;(q.pares||[]).forEach((p,pi)=>{if(resp[pi]===p.derecha||resp[String(pi)]===p.derecha)ok++;});return parseFloat(((ok/(q.pares||[]).length)*q.puntaje).toFixed(2));}
     case 'ordenar':{if(!Array.isArray(resp))return 0;let ok=0;(q.correctos||[]).forEach((v,i)=>{if(resp[i]===v)ok++;});return parseFloat(((ok/(q.correctos||[]).length)*q.puntaje).toFixed(2));}
+    case 'completar':{
+      // Auto-calificable con normalización: minúsculas, sin tildes ni especiales
+      if(!Array.isArray(resp))return 0;
+      const espacios=q.espacios||[];
+      if(!espacios.length)return 0;
+      const norm=s=>String(s||'')
+        .toLowerCase()
+        .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+        .replace(/[^a-z0-9,\-\s]/g,'')  // conservar comas y guiones medios como separadores
+        .replace(/\s*,\s*/g,',')              // normalizar espacios alrededor de comas
+        .replace(/\s*-\s*/g,'-')              // normalizar espacios alrededor de guiones
+        .trim().replace(/\s+/g,' ');
+      let ok=0;
+      espacios.forEach((correcto,i)=>{
+        if(norm(resp[i])===norm(correcto))ok++;
+      });
+      return parseFloat(((ok/espacios.length)*q.puntaje).toFixed(2));
+    }
     default:return 0;
   }
 }
@@ -1523,6 +1541,17 @@ function renderCodigoConLineas(codigo, lenguaje) {
     '</div>' +
     '<pre><code>' + filas + '</code></pre>' +
   '</div>';
+}
+
+// Normalizar texto para comparación: minúsculas, sin tildes ni caracteres especiales
+function normalizarTexto(s) {
+  return String(s||'')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')  // quitar tildes y diacríticos
+    .replace(/[^a-z0-9\s]/g, '')       // quitar caracteres especiales
+    .trim()
+    .replace(/\s+/g, ' ');             // espacios múltiples → uno solo
 }
 
 </script>
