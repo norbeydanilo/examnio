@@ -1391,6 +1391,7 @@ window.verRetroalimentacion = async () => {
         </div>
         <div class="retro-body">
           <div class="retro-enunciado">${q.enunciado}</div>
+          ${q.imagen?`<img src="${q.imagen}" style="max-width:100%;border-radius:8px;border:1px solid var(--border);margin-bottom:10px;margin-top:6px" alt="imagen">`:''}
           ${codigoHtml}
           <div class="retro-row">
             <div class="retro-box your">
@@ -1721,7 +1722,24 @@ window.descargarPDFRetro = async () => {
     pdf.text('Inicio: '+fmtTs(estudiante.inicio)+'   Fin: '+fmtTs(estudiante.fin), M, y);
     y += 5;
     pdf.text('Entrega: '+(estudiante.entregadoForzado?'Forzada (tiempo)':'Voluntaria')+'   Eventos sospechosos: '+(estudiante.eventos||[]).length, M, y);
-    y += 9;
+    y += 5;
+
+    // Listar eventos sospechosos si hay
+    const evts = estudiante.eventos || [];
+    if(evts.length > 0){
+      chk(evts.length * 5 + 8);
+      pdf.setFillColor(40, 25, 15); pdf.roundedRect(M, y, CW, evts.length*4.8+8, 1.5, 1.5, 'F');
+      pdf.setFillColor(...WARN); pdf.rect(M, y, 2.5, evts.length*4.8+8, 'F');
+      sf(6, true, WARN); pdf.text('EVENTOS SOSPECHOSOS', M+5, y+5.5);
+      evts.forEach((ev, ei) => {
+        sf(7, false, [230, 200, 160]);
+        const evTxt = clean('P'+ev.pregunta+'  '+ev.hora+'  '+ev.tipo);
+        pdf.text(evTxt, M+5, y+10+ei*4.8);
+      });
+      y += evts.length*4.8+12;
+    } else {
+      y += 4;
+    }
 
     // ── RESULTADO ────────────────────────────────────────────
     chk(34);
@@ -1802,12 +1820,13 @@ window.descargarPDFRetro = async () => {
       const bH = Math.max(tuLines.length, coLines.length)*5.2+12;
       chk(bH+4);
 
-      block(y, bH, SURFACE);
+      // Box izquierdo: tu respuesta
+      pdf.setFillColor(...SURFACE); pdf.roundedRect(M, y, hW, bH, 1.5, 1.5, 'F');
       pdf.setFillColor(...ACCENT); pdf.rect(M, y, 2.5, bH, 'F');
       sf(6, true, TEXT2); pdf.text('TU RESPUESTA', M+5, y+5.5);
       sf(8.5, false, TEXT); pdf.text(tuLines, M+5, y+10.5);
 
-      block(y, bH, SURFACE);  // ya dibujado — solo el segundo
+      // Box derecho: respuesta correcta
       pdf.setFillColor(...SURF2); pdf.roundedRect(M+hW+3, y, hW, bH, 1.5, 1.5, 'F');
       pdf.setFillColor(...sColor); pdf.rect(M+hW+3, y, 2.5, bH, 'F');
       sf(6, true, TEXT2); pdf.text(esMan?'CALIFICACION':'RESPUESTA CORRECTA', M+hW+7, y+5.5);
