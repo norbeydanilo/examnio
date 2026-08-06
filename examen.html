@@ -1437,6 +1437,7 @@ function fmtCorrectaRetro(q){
     case 'verdaderoFalso':return q.correcta?'Verdadero':'Falso';
     case 'emparejar':return (q.pares||[]).map(p=>p.izquierda+' → '+p.derecha).join('<br>');
     case 'ordenar':return (q.correctos||[]).join(' → ');
+    case 'completar':return (q.espacios||[]).join(' / ');
     default:return'—';
   }
 }

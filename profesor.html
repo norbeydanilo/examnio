@@ -1565,7 +1565,7 @@ const v  = id=>document.getElementById(id).value.trim();
 const sl = s=>s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]/g,'-').replace(/-+/g,'-').replace(/^-|-$/g,'');
 const escHtml=s=>s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 const fmtResp=r=>{if(r===undefined||r===null)return'—';if(typeof r==='boolean')return r?'Verdadero':'Falso';if(Array.isArray(r))return r.map(s=>String(s).replace(/\n/g,'<br>')).join(' / ');if(typeof r==='object')return Object.entries(r).map(([k,vl])=>`${parseInt(k)+1}→${vl}`).join(' | ');return String(r).replace(/\n/g,'<br>');};
-const fmtCorrecta=q=>{switch(q.tipo){case 'unica':return (q.correcta||'—').replace(/\n/g,'<br>');case 'multiple':return(q.correctas||[]).join(' / ');case 'verdaderoFalso':return q.correcta?'Verdadero':'Falso';case 'emparejar':return(q.pares||[]).map(p=>p.izquierda+' → '+p.derecha).join('<br>');case 'ordenar':return(q.correctos||[]).join(' → ');default:return'—';}};
+const fmtCorrecta=q=>{switch(q.tipo){case 'unica':return (q.correcta||'—').replace(/\n/g,'<br>');case 'multiple':return(q.correctas||[]).join(' / ');case 'verdaderoFalso':return q.correcta?'Verdadero':'Falso';case 'emparejar':return(q.pares||[]).map(p=>p.izquierda+' → '+p.derecha).join('<br>');case 'ordenar':return(q.correctos||[]).join(' → ');case 'completar':return(q.espacios||[]).join(' / ');default:return'—';}};
 
 let toastTimer;
 window.toast=(msg,type='success')=>{
