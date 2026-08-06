@@ -6,6 +6,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Examnio — Panel</title>
 
+
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 
 <style>
@@ -1556,9 +1557,7 @@ window.aprobarProfesor = async (uid, nombre, email) => {
   await updateDoc(doc(db,'profesores',uid), { estado:'aprobado', aprobadoEn:serverTimestamp() });
 
   // Notificar al profesor aprobado por email
-  // Crea en EmailJS una plantilla para notificar al profesor
-  // con variables: {{nombre_profesor}}, {{email_profesor}}
-  // y configura el "To email" como {{email_profesor}}
+  // Crea en EmailJS una plantilla para notificar al profesor (variables: to_name, to_email)
   try {
     if (window.emailjs) {
       await window.emailjs.send(EMAILJS_SERVICE, EMAILJS_TEMPLATE_APROBADO, {
