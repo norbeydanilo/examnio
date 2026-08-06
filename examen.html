@@ -1593,258 +1593,258 @@ window.descargarPDFRetro = async () => {
       : preguntas.map((q,i) => ({ pregunta:q, respuesta:respuestas[i] }));
 
     const fmtTs = ts => {
-      if(!ts) return '—';
+      if(!ts) return '-';
       try { const d=ts.toDate?ts.toDate():new Date(ts.seconds*1000); return d.toLocaleString('es-CO'); }
-      catch(_){ return '—'; }
+      catch(_){ return '-'; }
     };
-    const clean = s => String(s||'').replace(/<[^>]+>/g,'').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&amp;/g,'&').trim();
+
+    // Limpiar texto: quitar HTML, emojis y caracteres problemáticos para jsPDF
+    const clean = s => String(s||'')
+      .replace(/<[^>]+>/g,'')
+      .replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&amp;/g,'&').replace(/&quot;/g,'"')
+      .replace(/[^ -~À-ÿÀ-ɏ]/g, '')  // solo latin extendido
+      .trim();
+
     const fmtR = (resp,q) => {
       if(resp===undefined||resp===null||resp==='') return 'Sin respuesta';
       if(typeof resp==='boolean') return resp?'Verdadero':'Falso';
       if(resp===0||resp===1) return resp===1?'Verdadero':'Falso';
-      if(Array.isArray(resp)) return resp.join(', ');
-      if(typeof resp==='object') return Object.entries(resp).map(([k,v])=>{const p=q.pares&&q.pares[parseInt(k)];return(p?p.izquierda:k)+' → '+v;}).join('  ·  ');
-      return String(resp);
+      if(Array.isArray(resp)) return resp.map(clean).join(', ');
+      if(typeof resp==='object') return Object.entries(resp).map(([k,v])=>{
+        const p=q.pares&&q.pares[parseInt(k)];
+        return clean(p?p.izquierda:k)+' -> '+clean(v);
+      }).join('  /  ');
+      return clean(String(resp));
     };
     const fmtC = q => {
       switch(q.tipo){
-        case 'unica':        return clean(q.correcta||'—');
-        case 'multiple':     return (q.correctas||[]).map(clean).join('  ·  ');
+        case 'unica':        return clean(q.correcta||'-');
+        case 'multiple':     return (q.correctas||[]).map(clean).join('  /  ');
         case 'verdaderoFalso': return q.correcta?'Verdadero':'Falso';
-        case 'completar':    return (q.espacios||[]).join(' / ');
-        case 'emparejar':    return (q.pares||[]).map(p=>p.izquierda+' → '+p.derecha).join('  ·  ');
-        case 'ordenar':      return (q.correctos||[]).join(' → ');
-        default:             return '—';
+        case 'completar':    return (q.espacios||[]).map(clean).join(' / ');
+        case 'emparejar':    return (q.pares||[]).map(p=>clean(p.izquierda)+' -> '+clean(p.derecha)).join('  /  ');
+        case 'ordenar':      return (q.correctos||[]).map(clean).join(' -> ');
+        default:             return '-';
       }
     };
 
-    // ── Colores del tema Examnio ──
-    const C = {
-      bg:       [15,  17,  23],   // #0f1117
-      surface:  [26,  29,  39],   // #1a1d27
-      surface2: [34,  38,  58],   // #22263a
-      border:   [46,  51,  80],   // #2e3350
-      accent:   [79,  142, 247],  // #4f8ef7
-      accent2:  [124, 92,  191],  // #7c5cbf
-      success:  [46,  204, 113],  // #2ecc71
-      warning:  [243, 156, 18],   // #f39c12
-      danger:   [231, 76,  60],   // #e74c3c
-      text:     [232, 234, 240],  // #e8eaf0
-      text2:    [139, 144, 168],  // #8b90a8
-    };
-
     const pdf = new jsPDF({ orientation:'p', unit:'mm', format:'a4' });
-    const W=210, M=14, CW=W-M*2;
+    const W=210, M=15, CW=W-M*2;
     let y = M;
-    const LH = 5.5;
 
-    const chk = (n=12) => {
-      if(y+n > 283){ pdf.addPage(); y=M; drawPageBg(); }
-    };
+    // Paleta
+    const BG      = [15, 17, 23];
+    const SURFACE = [26, 29, 39];
+    const SURF2   = [34, 38, 58];
+    const ACCENT  = [79, 142, 247];
+    const ACCENT2 = [124, 92, 191];
+    const SUCCESS = [46, 204, 113];
+    const WARN    = [243, 156, 18];
+    const DANGER  = [231, 76, 60];
+    const TEXT    = [232, 234, 240];
+    const TEXT2   = [139, 144, 168];
+    const BORDER  = [46, 51, 80];
 
-    const drawPageBg = () => {
-      pdf.setFillColor(...C.bg);
-      pdf.rect(0, 0, W, 297, 'F');
-    };
+    const fillBg = () => { pdf.setFillColor(...BG); pdf.rect(0,0,W,297,'F'); };
+    const chk = (n=12) => { if(y+n>283){ pdf.addPage(); y=M; fillBg(); } };
 
-    const setFont = (size, bold=false, color=C.text) => {
+    const sf = (size, bold=false, color=TEXT) => {
       pdf.setFontSize(size);
       pdf.setFont('helvetica', bold?'bold':'normal');
       pdf.setTextColor(...color);
     };
 
-    const drawRect = (x, yy, w, h, color, radius=2) => {
+    const block = (yy, h, color=SURFACE, radius=1.5) => {
       pdf.setFillColor(...color);
-      if(radius) pdf.roundedRect(x, yy, w, h, radius, radius, 'F');
-      else pdf.rect(x, yy, w, h, 'F');
+      pdf.roundedRect(M, yy, CW, h, radius, radius, 'F');
     };
 
-    const writeLines = (text, x, maxW, size, bold=false, color=C.text) => {
-      setFont(size, bold, color);
-      const lines = pdf.splitTextToSize(String(text||''), maxW);
-      chk(lines.length * LH + 2);
-      pdf.text(lines, x, y);
-      y += lines.length * LH;
+    const accentBar = (yy, h, color=ACCENT) => {
+      pdf.setFillColor(...color);
+      pdf.rect(M, yy, 2.5, h, 'F');
+    };
+
+    const writeTxt = (t, x, yy, maxW, size, bold=false, color=TEXT, align='left') => {
+      sf(size, bold, color);
+      const lines = pdf.splitTextToSize(clean(t), maxW);
+      pdf.text(lines, x, yy, {align});
       return lines.length;
     };
 
-    // ── Fondo base ──
-    drawPageBg();
+    const writeBlock = (t, x, maxW, size, bold=false, color=TEXT) => {
+      sf(size, bold, color);
+      const lines = pdf.splitTextToSize(clean(t), maxW);
+      chk(lines.length * 5.2 + 2);
+      pdf.text(lines, x, y);
+      y += lines.length * 5.2;
+      return lines.length;
+    };
+
+    // ── Fondo ──
+    fillBg();
 
     // ── HEADER ──────────────────────────────────────────────
-    drawRect(0, 0, W, 42, [10, 12, 18], 0);
-    // Línea acento izquierda
-    drawRect(0, 0, 3, 42, C.accent, 0);
+    pdf.setFillColor(...[10,12,20]);
+    pdf.rect(0, 0, W, 40, 'F');
+    pdf.setFillColor(...ACCENT);
+    pdf.rect(0, 0, 4, 40, 'F');
 
-    setFont(20, true, C.accent);
-    pdf.text('Examnio', M+2, 14);
+    sf(18, true, ACCENT);
+    pdf.text('Examnio', M+4, 14);
 
-    setFont(8, false, C.text2);
-    pdf.text('Integridad académica en el examen digital', M+2, 21);
+    sf(8, false, TEXT2);
+    pdf.text('Integridad academica en el examen digital', M+4, 21);
 
-    setFont(11, true, C.text);
-    const titleLines = pdf.splitTextToSize(clean(examen.titulo||S.examenId), CW-10);
-    pdf.text(titleLines, M+2, 30);
+    sf(10, true, TEXT);
+    const titleLines = pdf.splitTextToSize(clean(examen.titulo||S.examenId), CW-20);
+    pdf.text(titleLines, M+4, 29);
 
-    // Fecha generación top right
-    setFont(7, false, C.text2);
-    const genDate = new Date().toLocaleString('es-CO');
-    pdf.text(genDate, W-M, 14, { align:'right' });
+    sf(7, false, TEXT2);
+    pdf.text(new Date().toLocaleDateString('es-CO'), W-M, 12, {align:'right'});
 
-    y = 50;
+    y = 48;
 
-    // ── BLOQUE ESTUDIANTE ────────────────────────────────────
-    chk(32);
-    drawRect(M, y, CW, 30, C.surface2);
-    drawRect(M, y, 3, 30, C.accent, 0);
+    // ── ESTUDIANTE ───────────────────────────────────────────
+    chk(34);
+    block(y, 32, SURF2);
+    accentBar(y, 32, ACCENT);
 
-    setFont(7, true, C.accent);
-    pdf.text('ESTUDIANTE', M+6, y+6);
+    sf(6.5, true, ACCENT);    pdf.text('ESTUDIANTE', M+6, y+7);
+    sf(11,  true, TEXT);      pdf.text(clean(estudiante.nombre||'-'), M+6, y+14);
+    sf(8,   false, TEXT2);    pdf.text('Codigo: '+clean(estudiante.codigo||'-'), M+6, y+21);
+    pdf.text('Correo: '+clean(estudiante.correo||'-'), M+6, y+26);
+    y += 38;
 
-    setFont(12, true, C.text);
-    pdf.text(estudiante.nombre||'—', M+6, y+13);
+    // ── METADATA ─────────────────────────────────────────────
+    chk(12);
+    sf(7.5, false, TEXT2);
+    pdf.text('Inicio: '+fmtTs(estudiante.inicio)+'   Fin: '+fmtTs(estudiante.fin), M, y);
+    y += 5;
+    pdf.text('Entrega: '+(estudiante.entregadoForzado?'Forzada (tiempo)':'Voluntaria')+'   Eventos sospechosos: '+(estudiante.eventos||[]).length, M, y);
+    y += 9;
 
-    setFont(8, false, C.text2);
-    pdf.text(`Código: ${estudiante.codigo||'—'}   ·   Correo: ${estudiante.correo||'—'}`, M+6, y+20);
-    pdf.text(`Inicio: ${fmtTs(estudiante.inicio)}   ·   Fin: ${fmtTs(estudiante.fin)}   ·   Entrega: ${estudiante.entregadoForzado?'Forzada':'Voluntaria'}   ·   Eventos: ${(estudiante.eventos||[]).length}`, M+6, y+26);
+    // ── RESULTADO ────────────────────────────────────────────
+    chk(34);
+    block(y, 30, SURFACE);
+    pdf.setFillColor(...BORDER);
+    pdf.roundedRect(M, y, CW, 30, 1.5, 1.5, 'S');
+
+    const notaColor = nota!==null&&nota!==undefined ? (nota>=esc.notaApro?SUCCESS:DANGER) : TEXT2;
+    const notaStr   = nota!==null&&nota!==undefined ? nota.toFixed(2) : 'Pendiente';
+
+    sf(6.5, true, TEXT2);
+    pdf.text('PUNTOS OBTENIDOS', M+6,        y+8);
+    pdf.text('PUNTOS TOTALES',   M+6+CW/4,   y+8);
+    pdf.text('NOTA FINAL',       M+6+CW/2,   y+8);
+    pdf.text('FORMULA',          M+6+CW*3/4, y+8);
+
+    sf(13, true, ACCENT);    pdf.text(ptsObt.toFixed(2),   M+6,        y+20);
+    sf(13, true, TEXT);      pdf.text(ptsTotal.toFixed(2), M+6+CW/4,   y+20);
+    sf(13, true, notaColor); pdf.text(notaStr,              M+6+CW/2,   y+20);
+    sf(7,  false, TEXT2);
+    const formula = esc.notaMin+' + ('+ptsObt.toFixed(2)+'/'+ptsTotal+') x ('+esc.notaMax+'-'+esc.notaMin+')';
+    const fLines  = pdf.splitTextToSize(formula, CW/4-8);
+    pdf.text(fLines, M+6+CW*3/4, y+16);
     y += 36;
 
-    // ── BLOQUE RESULTADO ─────────────────────────────────────
-    chk(30);
-    drawRect(M, y, CW, 28, C.surface);
-    drawRect(M, y, 3, 28, [60,60,100], 0);
-
-    const cols = [{label:'PUNTOS OBTENIDOS', val:ptsObt.toFixed(2), color:C.accent},
-                  {label:'PUNTOS TOTALES',   val:ptsTotal.toFixed(2), color:C.accent},
-                  {label:'NOTA FINAL',       val:nota!==null&&nota!==undefined?nota.toFixed(2):'Pendiente',
-                   color:nota!==null&&nota!==undefined?(nota>=esc.notaApro?C.success:C.danger):C.text2},
-                  {label:'FÓRMULA',          val:`${esc.notaMin} + (${ptsObt.toFixed(2)}/${ptsTotal}) × (${esc.notaMax}−${esc.notaMin})`, color:C.text2}];
-
-    const colW = CW / cols.length;
-    cols.forEach((c, ci) => {
-      const cx = M + 6 + ci * colW;
-      setFont(7, true, C.text2);
-      pdf.text(c.label, cx, y+7);
-      setFont(ci<3?12:8, true, c.color);
-      const vLines = pdf.splitTextToSize(c.val, colW-4);
-      pdf.text(vLines, cx, y+16);
-    });
-    y += 34;
+    // ── TÍTULO SECCIÓN ───────────────────────────────────────
+    chk(10);
+    sf(8, true, TEXT2);
+    pdf.text('DETALLE POR PREGUNTA', M, y);
+    pdf.setDrawColor(...BORDER);
+    pdf.setLineWidth(0.3);
+    pdf.line(M, y+2.5, W-M, y+2.5);
+    y += 9;
 
     // ── PREGUNTAS ────────────────────────────────────────────
-    chk(10);
-    setFont(9, true, C.text2);
-    pdf.text('DETALLE POR PREGUNTA', M, y);
-    // Línea separadora
-    pdf.setDrawColor(...C.border);
-    pdf.setLineWidth(0.3);
-    pdf.line(M, y+2, W-M, y+2);
-    y += 8;
-
     mapa.forEach(({pregunta:q, respuesta:resp}, qi) => {
       const pts   = q.autoCalificable ? calcPuntajeLocal(resp, q) : null;
       const esMan = !q.autoCalificable;
       const ok    = pts!==null && pts>=q.puntaje;
       const par   = pts!==null && pts>0 && pts<q.puntaje;
-      const statusColor = esMan?C.accent2 : ok?C.success : par?C.warning : C.danger;
-      const statusLabel = esMan?'MANUAL' : ok?'CORRECTO' : par?'PARCIAL' : 'INCORRECTO';
-      const tipoL = {unica:'Única',multiple:'Múltiple',verdaderoFalso:'V/F',
+      const sColor = esMan?ACCENT2 : ok?SUCCESS : par?WARN : DANGER;
+      const sLabel = esMan?'Manual' : ok?'Correcto' : par?'Parcial' : 'Incorrecto';
+      const pLabel = esMan?'? / '+q.puntaje+' pts' : pts.toFixed(2)+' / '+q.puntaje+' pts';
+      const tipoL  = {unica:'Unica',multiple:'Multiple',verdaderoFalso:'V/F',
         completar:'Completar',abierto:'Abierta',emparejar:'Emparejar',ordenar:'Ordenar'}[q.tipo]||q.tipo;
-      const ptsLabel = esMan ? `? / ${q.puntaje} pts` : `${pts.toFixed(2)} / ${q.puntaje} pts`;
 
-      // ── Header pregunta ──
-      chk(14);
-      drawRect(M, y, CW, 10, C.surface2);
-      drawRect(M, y, 3, 10, statusColor, 0);
+      // Calcular altura total del bloque para evitar cortes
+      sf(8.5, false, TEXT);
+      const enLines = pdf.splitTextToSize(clean(q.enunciado), CW-8);
+      const tuLines = pdf.splitTextToSize(fmtR(resp,q), (CW-3)/2-6);
+      const coLines = pdf.splitTextToSize(esMan?'Pendiente de revision':fmtC(q), (CW-3)/2-6);
+      const retLines = q.retroalimentacion ? pdf.splitTextToSize(clean(q.retroalimentacion), CW-10) : [];
+      const totalH = 12 + enLines.length*5.2+6 + Math.max(tuLines.length,coLines.length)*5.2+14 + (retLines.length?(retLines.length*5.2+12):0) + 8;
+      chk(Math.min(totalH, 60));
 
-      setFont(8, true, C.text);
-      pdf.text(`${qi+1}.  ${tipoL}`, M+6, y+6.5);
-
-      // Badge estado
-      const badgeW = pdf.getTextWidth(statusLabel) + 4;
-      drawRect(M+CW-badgeW-20, y+2, badgeW, 6, [...statusColor.map(v=>Math.min(255,v+180|0).toString(16).padStart(2,'0'))].join('')==='ffffff'?statusColor:[...statusColor].map(v=>Math.floor(v*0.2)), 1);
-      setFont(6, true, statusColor);
-      pdf.text(statusLabel, M+CW-badgeW-18, y+6.3);
-
-      setFont(8, false, C.text2);
-      pdf.text(ptsLabel, W-M-2, y+6.5, {align:'right'});
+      // Header
+      block(y, 10, SURF2);
+      pdf.setFillColor(...sColor);
+      pdf.rect(M, y, 2.5, 10, 'F');
+      sf(8, true, TEXT);
+      pdf.text(qi+1+'.  '+tipoL, M+6, y+6.5);
+      sf(7.5, true, sColor);
+      pdf.text(sLabel, M+CW/2, y+6.5);
+      sf(8, false, TEXT2);
+      pdf.text(pLabel, W-M-2, y+6.5, {align:'right'});
       y += 12;
 
-      // ── Enunciado ──
-      const enTxt = clean(q.enunciado);
-      const enLines = pdf.splitTextToSize(enTxt, CW-8);
-      const enH = enLines.length * LH + 8;
-      chk(enH + 2);
-      drawRect(M, y, CW, enH, C.surface);
-      setFont(9, false, C.text);
+      // Enunciado
+      const enH = enLines.length*5.2+8;
+      chk(enH+2);
+      block(y, enH, SURFACE);
+      sf(8.5, false, TEXT);
       pdf.text(enLines, M+4, y+6);
-      y += enH + 3;
+      y += enH+3;
 
-      // ── Respuestas ──
-      const hW = (CW - 3) / 2;
-      const tuTxt  = fmtR(resp, q);
-      const corTxt = esMan ? 'El profesor revisará esta respuesta' : fmtC(q);
-      const tuLines  = pdf.splitTextToSize(tuTxt,  hW - 6);
-      const corLines = pdf.splitTextToSize(corTxt, hW - 6);
-      const bH = Math.max(tuLines.length, corLines.length) * LH + 12;
+      // Respuestas
+      const hW = (CW-3)/2;
+      const bH = Math.max(tuLines.length, coLines.length)*5.2+12;
+      chk(bH+4);
 
-      chk(bH + 4);
+      block(y, bH, SURFACE);
+      pdf.setFillColor(...ACCENT); pdf.rect(M, y, 2.5, bH, 'F');
+      sf(6, true, TEXT2); pdf.text('TU RESPUESTA', M+5, y+5.5);
+      sf(8.5, false, TEXT); pdf.text(tuLines, M+5, y+10.5);
 
-      // Box tu respuesta
-      drawRect(M, y, hW, bH, C.surface);
-      drawRect(M, y, 2, bH, C.accent, 0);
-      setFont(6, true, C.text2);
-      pdf.text('TU RESPUESTA', M+4, y+5);
-      setFont(8.5, false, C.text);
-      pdf.text(tuLines, M+4, y+10);
+      block(y, bH, SURFACE);  // ya dibujado — solo el segundo
+      pdf.setFillColor(...SURF2); pdf.roundedRect(M+hW+3, y, hW, bH, 1.5, 1.5, 'F');
+      pdf.setFillColor(...sColor); pdf.rect(M+hW+3, y, 2.5, bH, 'F');
+      sf(6, true, TEXT2); pdf.text(esMan?'CALIFICACION':'RESPUESTA CORRECTA', M+hW+7, y+5.5);
+      sf(8.5, false, esMan?ACCENT2:TEXT); pdf.text(coLines, M+hW+7, y+10.5);
+      y += bH+3;
 
-      // Box respuesta correcta
-      const rx = M + hW + 3;
-      drawRect(rx, y, hW, bH, C.surface);
-      drawRect(rx, y, 2, bH, statusColor, 0);
-      setFont(6, true, C.text2);
-      pdf.text(esMan?'CALIFICACIÓN':'RESPUESTA CORRECTA', rx+4, y+5);
-      setFont(8.5, false, esMan?C.accent2:C.text);
-      pdf.text(corLines, rx+4, y+10);
-
-      y += bH + 3;
-
-      // ── Retroalimentación ──
-      if(q.retroalimentacion){
-        const retTxt = clean(q.retroalimentacion);
-        const retLines = pdf.splitTextToSize(retTxt, CW-10);
-        const retH = retLines.length * LH + 10;
-        chk(retH + 2);
-        drawRect(M, y, CW, retH, [18, 22, 38]);
-        drawRect(M, y, 2, retH, C.accent, 0);
-        setFont(6, true, C.accent);
-        pdf.text('💡 RETROALIMENTACIÓN', M+4, y+5);
-        setFont(8, false, [190, 210, 245]);
-        pdf.text(retLines, M+4, y+10);
-        y += retH + 3;
+      // Retroalimentacion
+      if(q.retroalimentacion && retLines.length){
+        const retH = retLines.length*5.2+10;
+        chk(retH+2);
+        pdf.setFillColor(18,22,40); pdf.roundedRect(M, y, CW, retH, 1.5, 1.5, 'F');
+        pdf.setFillColor(...ACCENT); pdf.rect(M, y, 2.5, retH, 'F');
+        sf(6, true, ACCENT);  pdf.text('Retroalimentacion', M+5, y+5.5);
+        sf(8, false, [190,210,245]); pdf.text(retLines, M+5, y+10.5);
+        y += retH+3;
       }
 
-      // Separador entre preguntas
-      pdf.setDrawColor(...C.border);
+      // Separador
+      pdf.setDrawColor(...BORDER);
       pdf.setLineWidth(0.2);
       pdf.line(M, y, W-M, y);
-      y += 5;
+      y += 6;
     });
 
-    // ── PIE DE PÁGINA ────────────────────────────────────────
+    // ── PIE ──────────────────────────────────────────────────
     const pages = pdf.internal.getNumberOfPages();
     for(let i=1; i<=pages; i++){
       pdf.setPage(i);
-      drawRect(0, 289, W, 8, [10,12,18], 0);
-      setFont(7, false, C.text2);
-      pdf.text(`Examnio  ·  ${clean(examen.titulo||'')}  ·  ${estudiante.nombre||''}`, M, 294);
-      pdf.text(`${i} / ${pages}`, W-M, 294, {align:'right'});
+      pdf.setFillColor(10,12,20); pdf.rect(0,289,W,8,'F');
+      sf(7, false, TEXT2);
+      pdf.text('Examnio  |  '+clean(examen.titulo||'')+'  |  '+clean(estudiante.nombre||''), M, 294);
+      pdf.text(i+' / '+pages, W-M, 294, {align:'right'});
     }
 
-    // ── NOMBRE ARCHIVO ───────────────────────────────────────
     const slug = s => String(s).normalize('NFD').replace(/[̀-ͯ]/g,'')
       .replace(/[^a-zA-Z0-9]/g,'_').replace(/_+/g,'_').replace(/^_|_$/g,'');
-    pdf.save(`${slug(estudiante.codigo)}_${slug(estudiante.nombre)}_${slug(examen.titulo||S.examenId)}.pdf`);
+    pdf.save(slug(estudiante.codigo)+'_'+slug(estudiante.nombre)+'_'+slug(examen.titulo||S.examenId)+'.pdf');
 
   } catch(e) {
     alert('Error generando PDF: ' + e.message);
