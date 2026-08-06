@@ -60,21 +60,26 @@
       "Para opciones con salidas de consola multilínea usar \\n como separador (ej: 'Línea1\\nLínea2')",
       "El campo 'codigo' es opcional: código fuente que se muestra con resaltado Night Owl",
       "El campo 'imagen' es opcional: URL pública de una imagen",
-      "El campo 'lenguaje' especifica el lenguaje del código (Java, Python, JavaScript, SQL)"
+      "El campo 'lenguaje' especifica el lenguaje del código (Java, Python, JavaScript, SQL)",
+      "El campo 'retroalimentacion' es opcional pero recomendado en todos los tipos — explica por qué la(s) respuesta(s) correcta(s) lo son. En preguntas abiertas, describe qué elementos debe contener una respuesta completa. Se muestra al estudiante en la vista de retroalimentación."
     ],
     "tipos_disponibles": {
       "unica": "Selección única — una sola respuesta correcta",
       "multiple": "Selección múltiple — varias respuestas correctas, con opción de restar por incorrectas",
       "verdaderoFalso": "Verdadero o Falso — correcta es boolean true o false",
-      "completar": "Rellenar espacios en blanco — usar ___ en el enunciado, espacios es array con las respuestas en orden",
+      "completar": "Rellenar espacios en blanco — usar ___ en el enunciado, 'espacios' es array con las respuestas correctas en orden. Auto-calificable con normalización: sin distinción de mayúsculas ni tildes. Conserva comas y guiones medios como separadores válidos (útil para recorridos: 'A,B,C' o 'A-B-C'). Espacios alrededor de separadores se ignoran: 'A, B, C' = 'A,B,C'.",
       "abierto": "Pregunta abierta — siempre autoCalificable: false, requiere revisión manual del profesor",
       "emparejar": "Emparejar columnas — pares es array de {izquierda, derecha}",
       "ordenar": "Ordenar elementos — items es el array desordenado, correctos es el orden correcto"
+    },
+    "comentario_profesor": {
+      "descripcion": "Las preguntas manuales (abierto, completar) tienen dos campos de retroalimentación desde el panel del profesor:",
+      "retroalimentacion_json": "Campo 'retroalimentacion' en el JSON — retroalimentación general de la pregunta, redactada por el profesor al crear el examen. Se muestra siempre al estudiante.",
+      "comentario_profesor": "Campo editable en el panel Calificar — comentario personalizado que el profesor escribe al calificar cada respuesta individual. Se guarda en Firebase y se muestra al estudiante junto con su nota manual.",
+      "vista_estudiante": "El estudiante ve: puntaje obtenido (X / Y pts) + retroalimentación del JSON (💡) + comentario del profesor (✏) si fue escrito."
     }
   },
-
   "_plantilla_preguntas": [
-
     {
       "_comentario": "TIPO: unica — Selección única",
       "id": "tema-1",
@@ -91,9 +96,9 @@
       ],
       "correcta": "Texto de la opción correcta",
       "puntaje": 1,
-      "autoCalificable": true
+      "autoCalificable": true,
+      "retroalimentacion": "Explicación de por qué esta es la respuesta correcta y por qué las otras no lo son."
     },
-
     {
       "_comentario": "TIPO: multiple — Selección múltiple con restar (estándar Moodle)",
       "id": "tema-2",
@@ -113,9 +118,9 @@
       ],
       "restar": true,
       "puntaje": 1.5,
-      "autoCalificable": true
+      "autoCalificable": true,
+      "retroalimentacion": "Explicación de por qué estas opciones son correctas y qué hace incorrectas a las demás."
     },
-
     {
       "_comentario": "TIPO: verdaderoFalso",
       "id": "tema-3",
@@ -123,19 +128,23 @@
       "enunciado": "Afirmación que el estudiante debe evaluar como verdadera o falsa.",
       "correcta": true,
       "puntaje": 1,
-      "autoCalificable": true
+      "autoCalificable": true,
+      "retroalimentacion": "Explicación de por qué la afirmación es verdadera/falsa."
     },
-
     {
       "_comentario": "TIPO: completar — usar ___ para cada espacio en blanco",
       "id": "tema-4",
       "tipo": "completar",
       "enunciado": "El ___ es el principio que permite ___ los datos de una clase mediante modificadores de acceso.",
-      "espacios": ["encapsulamiento", "proteger"],
+      "espacios": [
+        "encapsulamiento",
+        "proteger"
+      ],
       "puntaje": 1.5,
-      "autoCalificable": false
+      "autoCalificable": true,
+      "retroalimentacion": "Explica los términos correctos para cada espacio y por qué. Recuerda: las respuestas se comparan sin distinguir mayúsculas, tildes ni caracteres especiales. Las comas y guiones medios sí se tienen en cuenta como separadores.",
+      "_nota": "Para recorridos usar: \"espacios\": [\"D,B,C,H,R,A,T\"] — el estudiante puede escribir 'D,B,C,H,R,A,T' o 'D, B, C, H, R, A, T'"
     },
-
     {
       "_comentario": "TIPO: abierto — siempre manual",
       "id": "tema-5",
@@ -144,34 +153,53 @@
       "codigo": "// Opcional: código de referencia si aplica",
       "lenguaje": "Java",
       "puntaje": 2,
-      "autoCalificable": false
+      "autoCalificable": false,
+      "retroalimentacion": "Explica aquí qué elementos debe contener una respuesta completa y correcta. Por ejemplo: debe mencionar X concepto, Y ejemplo, y Z relación. Esto se muestra al estudiante en la retroalimentación junto con el comentario personalizado del profesor."
     },
-
     {
       "_comentario": "TIPO: emparejar — relacionar columna izquierda con columna derecha",
       "id": "tema-6",
       "tipo": "emparejar",
       "enunciado": "Relaciona cada concepto con su descripción correcta:",
       "pares": [
-        { "izquierda": "Concepto A", "derecha": "Descripción de A" },
-        { "izquierda": "Concepto B", "derecha": "Descripción de B" },
-        { "izquierda": "Concepto C", "derecha": "Descripción de C" }
+        {
+          "izquierda": "Concepto A",
+          "derecha": "Descripción de A"
+        },
+        {
+          "izquierda": "Concepto B",
+          "derecha": "Descripción de B"
+        },
+        {
+          "izquierda": "Concepto C",
+          "derecha": "Descripción de C"
+        }
       ],
       "puntaje": 1.5,
-      "autoCalificable": true
+      "autoCalificable": true,
+      "retroalimentacion": "Explicación de cada par correcto."
     },
-
     {
       "_comentario": "TIPO: ordenar — arrastrar para ordenar correctamente",
       "id": "tema-7",
       "tipo": "ordenar",
       "enunciado": "Ordena los siguientes pasos en el orden correcto:",
-      "items": ["Paso C", "Paso A", "Paso D", "Paso B"],
-      "correctos": ["Paso A", "Paso B", "Paso C", "Paso D"],
+      "items": [
+        "Paso C",
+        "Paso A",
+        "Paso D",
+        "Paso B"
+      ],
+      "correctos": [
+        "Paso A",
+        "Paso B",
+        "Paso C",
+        "Paso D"
+      ],
       "puntaje": 1,
-      "autoCalificable": true
+      "autoCalificable": true,
+      "retroalimentacion": "Explicación del orden correcto y por qué."
     },
-
     {
       "_comentario": "TIPO: unica con salida de consola multilínea (usar \\n en opciones)",
       "id": "tema-8",
@@ -187,10 +215,10 @@
       ],
       "correcta": "Hola\nMundo",
       "puntaje": 1,
-      "autoCalificable": true
+      "autoCalificable": true,
+      "retroalimentacion": "Explicación de por qué esta es la respuesta correcta y por qué las otras no lo son."
     }
   ],
-
   "_guia_de_dificultad": {
     "recomendaciones": [
       "Puntaje 1.0: preguntas de definición directa, V/F o memorización básica",
@@ -205,7 +233,6 @@
       "abiertas_por_examen": "2-3 máximo para no saturar la calificación manual"
     }
   },
-
   "_errores_comunes": [
     "No poner letra prefix en las opciones (MAL: 'A) texto', BIEN: 'texto')",
     "El campo 'correcta' debe ser IDÉNTICO al texto de la opción, incluyendo mayúsculas y tildes",
