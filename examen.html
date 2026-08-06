@@ -974,8 +974,9 @@ function renderQuestion(idx) {
       <div class="q-body">
         ${q.tipo !== 'completar' ? `<div class="q-enunciado">${q.enunciado}</div>` : ''}
         ${q.imagen?`<img src="${q.imagen}" style="max-width:100%;border-radius:8px;border:1px solid var(--border);margin-bottom:14px" alt="imagen">`:''}
-        ${codigoHtml}
+        ${q.tipo !== 'completar' ? codigoHtml : ''}
         <div id="answer-ui">${renderAnswerUI(q,idx)}</div>
+        ${q.tipo === 'completar' ? codigoHtml : ''}
         ${answered?`<div class="locked-note">🔒 Respuesta guardada — no se puede modificar</div>`:''}
       </div>
     </div>`;
