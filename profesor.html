@@ -1087,6 +1087,7 @@ function renderCalificacion(){
           ${!q.autoCalificable?`<input class="grade-input" type="number" min="0" max="${q.puntaje}" step="0.25" id="man-${s.id}-${q.id}" value="${prevMan!==undefined?prevMan:''}" placeholder="0–${q.puntaje}" oninput="recalcularNota('${s.id}')" onfocus="recalcularNota('${s.id}')">`:''}
         </div>
         <div class="cal-enunciado">${q.enunciado}</div>
+        ${q.imagen?`<img src="${q.imagen}" style="max-width:100%;border-radius:8px;border:1px solid var(--border);margin-bottom:10px;margin-top:6px" alt="imagen">`:''}
         ${codigoHtml}
         <div class="cal-resp-row">
           <div class="cal-resp-box your"><div class="cal-resp-label">Respuesta del estudiante</div><div class="cal-resp-val">${tuResp||'<em style="color:var(--text2)">Sin respuesta</em>'}</div></div>
@@ -1107,15 +1108,20 @@ function renderCalificacion(){
             ${(s.eventos||[]).length?`<span class="badge badge-yellow">⚠ ${s.eventos.length} evento${s.eventos.length!==1?'s':''}</span>`:''}
             ${(()=>{
               const tieneNota = s.calificacion!==null&&s.calificacion!==undefined;
-              const necesitaManual = preguntas.some(q=>!q.autoCalificable);
-              const tieneManual = necesitaManual && Object.keys(s.calificacionManual||{}).length>0;
+              const pregsManuales = preguntas.filter(q=>!q.autoCalificable);
+              const necesitaManual = pregsManuales.length > 0;
+              // Verificar que TODAS las preguntas manuales tienen calificación numérica
+              const manualCompleto = necesitaManual && pregsManuales.every(q=>{
+                const v=(s.calificacionManual||{})[q.id];
+                return v!==undefined && v!==null && !isNaN(parseFloat(v));
+              });
               if(!s.entregado) return '';
-              if(tieneNota && (!necesitaManual || tieneManual))
+              if(tieneNota && (!necesitaManual || manualCompleto))
                 return '<span class="badge badge-green">✓ Nota guardada</span>';
-              if(tieneNota && necesitaManual && !tieneManual)
-                return '<span class="badge badge-yellow">⚠ Nota sin manuales</span>';
+              if(tieneNota && necesitaManual && !manualCompleto)
+                return '<span class="badge badge-yellow">⚠ Pendiente manuales</span>';
               if(!tieneNota && necesitaManual)
-                return '<span class="badge" style="background:rgba(139,144,168,.15);color:var(--text2)">Pendiente revisión</span>';
+                return '<span class="badge" style="background:rgba(139,144,168,.15);color:var(--text2)">Pendiente revision</span>';
               if(!tieneNota)
                 return '<span class="badge" style="background:rgba(139,144,168,.15);color:var(--text2)">Sin calificar</span>';
               return '';
