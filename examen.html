@@ -972,7 +972,7 @@ function renderQuestion(idx) {
         <span class="q-pts">${q.puntaje} pt${q.puntaje!==1?'s':''}</span>
       </div>
       <div class="q-body">
-        <div class="q-enunciado">${q.enunciado}</div>
+        ${q.tipo !== 'completar' ? `<div class="q-enunciado">${q.enunciado}</div>` : ''}
         ${q.imagen?`<img src="${q.imagen}" style="max-width:100%;border-radius:8px;border:1px solid var(--border);margin-bottom:14px" alt="imagen">`:''}
         ${codigoHtml}
         <div id="answer-ui">${renderAnswerUI(q,idx)}</div>
