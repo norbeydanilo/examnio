@@ -450,7 +450,15 @@ pre[class*="language-"] {
         <div class="card">
           <div class="card-header"><h3>Seleccionar examen</h3></div>
           <div class="card-body" style="display:flex;gap:8px;">
-            <select id="mon-examen" style="flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:8px 11px;font-family:var(--font);outline:none;"><option value="">— selecciona —</option></select>
+            <div style="display:flex;gap:8px;flex:1;flex-wrap:wrap;">
+            <select id="mon-filtro-univ" style="flex:1;min-width:140px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:8px 11px;font-family:var(--font);outline:none;" onchange="filtrarExamenesMonitor()">
+              <option value="">Todas las universidades</option>
+            </select>
+            <select id="mon-filtro-sem" style="flex:1;min-width:120px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:8px 11px;font-family:var(--font);outline:none;" onchange="filtrarExamenesMonitor()">
+              <option value="">Todos los semestres</option>
+            </select>
+            <select id="mon-examen" style="flex:2;min-width:180px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:8px 11px;font-family:var(--font);outline:none;"><option value="">— selecciona examen —</option></select>
+          </div>
             <button class="btn" onclick="loadMonitor()">Ver monitor</button>
           </div>
         </div>
@@ -476,7 +484,13 @@ pre[class*="language-"] {
         <div class="card">
           <div class="card-header"><h3>Seleccionar examen</h3></div>
           <div class="card-body" style="display:flex;gap:8px;flex-wrap:wrap;">
-            <select id="cal-examen" style="flex:1;min-width:180px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:8px 11px;font-family:var(--font);outline:none;"><option value="">— selecciona —</option></select>
+            <select id="cal-filtro-univ" style="flex:1;min-width:140px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:8px 11px;font-family:var(--font);outline:none;" onchange="filtrarExamenesCalificar()">
+              <option value="">Todas las universidades</option>
+            </select>
+            <select id="cal-filtro-sem" style="flex:1;min-width:120px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:8px 11px;font-family:var(--font);outline:none;" onchange="filtrarExamenesCalificar()">
+              <option value="">Todos los semestres</option>
+            </select>
+            <select id="cal-examen" style="flex:2;min-width:180px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:8px 11px;font-family:var(--font);outline:none;"><option value="">— selecciona examen —</option></select>
             <button class="btn" onclick="loadCalificacion()">Cargar</button>
             <button class="btn secondary" onclick="descargarExcel()" id="btn-excel" style="display:none">⬇ Excel</button>
             <button class="btn warning" onclick="recalcularTodos()" id="btn-recalcular" style="display:none">🔄 Recalcular y guardar todas las notas</button>
@@ -766,7 +780,7 @@ function tradAuth(code){
   return m[code]||'Error de autenticación.';
 }
 
-async function initApp(){ await loadGrupos(); await loadExamenes(); fillExamenSelects(); handleRoute(); }
+async function initApp(){ await loadGrupos(); await loadExamenes(); fillExamenSelects(); poblarFiltros(); handleRoute(); }
 
 // ── NAV ───────────────────────────────────────────────────────
 window.goTab=(tabId,el,title)=>{
@@ -880,7 +894,7 @@ window.crearExamen=async()=>{
   ['ex-titulo','ex-id','ex-sub','ex-json'].forEach(i=>document.getElementById(i).value='');
   document.getElementById('ex-grupo').value='';
   document.getElementById('json-status').textContent='';
-  toast('Examen creado: '+id); await loadExamenes(); fillExamenSelects();
+  toast('Examen creado: '+id); await loadExamenes(); fillExamenSelects(); poblarFiltros();
 };
 window.toggleActivo=async(id,val)=>{
   await updateDoc(doc(db,'examenes',id),{activo:val});
@@ -906,7 +920,7 @@ window.toggleRetro=async(id,val)=>{
   if(label) label.textContent=val?'Visible':'Oculta';
   toast(val?'Retroalimentación visible.':'Retroalimentación oculta.');
 };
-window.eliminarExamen=async(id)=>{if(!confirm(`¿Eliminar "${id}"?`))return;await deleteDoc(doc(db,'examenes',id));clearMonitor();await loadExamenes();fillExamenSelects();toast('Examen eliminado.');};
+window.eliminarExamen=async(id)=>{if(!confirm(`¿Eliminar "${id}"?`))return;await deleteDoc(doc(db,'examenes',id));clearMonitor();await loadExamenes();fillExamenSelects();poblarFiltros();toast('Examen eliminado.');};
 window.verJSON=id=>{const w=window.open('','_blank');w.document.write(`<pre style="background:#0f1117;color:#c9d1d9;padding:20px;font-size:12px;font-family:monospace">${JSON.stringify(EXAMENES[id].preguntas,null,2)}</pre>`);};
 window.validarJSON=()=>{
   const st=document.getElementById('json-status');
@@ -914,6 +928,78 @@ window.validarJSON=()=>{
     st.textContent=`✅ ${a.length} preguntas, ${a.reduce((s,q)=>s+(q.puntaje||0),0)} pts`;st.style.color='var(--success)';previewEscala();
   }catch(e){st.textContent='❌ '+e.message;st.style.color='var(--danger)';}
 };
+// ── FILTROS UNIVERSIDAD / SEMESTRE ───────────────────────────
+function poblarFiltros() {
+  const univs = new Set();
+  const sems  = new Set();
+
+  Object.keys(EXAMENES).forEach(k => {
+    const g = GRUPOS[EXAMENES[k].grupoId] || {};
+    if(g.universidad) univs.add(g.universidad);
+    if(g.año)         sems.add(g.año);
+  });
+
+  ['mon-filtro-univ','cal-filtro-univ'].forEach(id => {
+    const sel = document.getElementById(id); if(!sel) return;
+    const cur = sel.value;
+    sel.innerHTML = '<option value="">Todas las universidades</option>';
+    [...univs].sort().forEach(u => {
+      const o = document.createElement('option'); o.value=u; o.textContent=u; sel.appendChild(o);
+    });
+    if(cur) sel.value = cur;
+  });
+
+  ['mon-filtro-sem','cal-filtro-sem'].forEach(id => {
+    const sel = document.getElementById(id); if(!sel) return;
+    const cur = sel.value;
+    sel.innerHTML = '<option value="">Todos los semestres</option>';
+    [...sems].sort().reverse().forEach(s => {
+      const o = document.createElement('option'); o.value=s; o.textContent=s; sel.appendChild(o);
+    });
+    if(cur) sel.value = cur;
+  });
+
+  filtrarExamenesMonitor();
+  filtrarExamenesCalificar();
+}
+
+function examenesFiltered(univSelId, semSelId) {
+  const univ = document.getElementById(univSelId)?.value || '';
+  const sem  = document.getElementById(semSelId)?.value  || '';
+  return Object.keys(EXAMENES).filter(k => {
+    const g = GRUPOS[EXAMENES[k].grupoId] || {};
+    if(univ && g.universidad !== univ) return false;
+    if(sem  && g.año !== sem)          return false;
+    return true;
+  });
+}
+
+window.filtrarExamenesMonitor = () => {
+  const sel = document.getElementById('mon-examen'); if(!sel) return;
+  const cur = sel.value;
+  sel.innerHTML = '<option value="">— selecciona examen —</option>';
+  examenesFiltered('mon-filtro-univ','mon-filtro-sem').forEach(k => {
+    const ex=EXAMENES[k], g=GRUPOS[ex.grupoId]||{};
+    const o=document.createElement('option'); o.value=k;
+    o.textContent=k+' — '+ex.titulo+' ('+( g.año||'—')+')';
+    sel.appendChild(o);
+  });
+  if(cur) sel.value = cur;
+};
+
+window.filtrarExamenesCalificar = () => {
+  const sel = document.getElementById('cal-examen'); if(!sel) return;
+  const cur = sel.value;
+  sel.innerHTML = '<option value="">— selecciona examen —</option>';
+  examenesFiltered('cal-filtro-univ','cal-filtro-sem').forEach(k => {
+    const ex=EXAMENES[k], g=GRUPOS[ex.grupoId]||{};
+    const o=document.createElement('option'); o.value=k;
+    o.textContent=k+' — '+ex.titulo+' ('+(g.año||'—')+')';
+    sel.appendChild(o);
+  });
+  if(cur) sel.value = cur;
+};
+
 function fillExamenSelects(){
   ['mon-examen','cal-examen','admin-examen','admin-ex2','rec-examen'].forEach(selId=>{
     const sel=document.getElementById(selId); if(!sel)return;
