@@ -479,6 +479,7 @@ pre[class*="language-"] {
             <button class="btn" onclick="loadCalificacion()">Cargar</button>
             <button class="btn secondary" onclick="descargarExcel()" id="btn-excel" style="display:none">⬇ Excel</button>
             <button class="btn warning" onclick="recalcularTodos()" id="btn-recalcular" style="display:none">🔄 Recalcular y guardar todas las notas</button>
+            <button class="btn success" onclick="guardarTodasLasNotas()" id="btn-guardar-todas" style="display:none">💾 Guardar nota a todos</button>
           </div>
           <div class="card-body" style="padding-top:0;" id="cal-filters-wrap" style="display:none">
             <div class="monitor-filters" id="cal-filters" style="display:none">
@@ -835,7 +836,7 @@ async function loadExamenes(){
 function renderExamenesList(){
   const el=document.getElementById('examenes-list'), keys=Object.keys(EXAMENES);
   if(!keys.length){el.innerHTML='<div class="empty-state">No hay exámenes.</div>';return;}
-  el.innerHTML=`<div class="table-wrap"><table><thead><tr><th>Código</th><th>Título</th><th>Grupo / Semestre</th><th>Tiempo</th><th>Escala</th><th>Pgs</th><th>Estado</th><th>Retro</th><th></th></tr></thead><tbody>${
+  el.innerHTML=`<div class="table-wrap"><table><thead><tr><th>Código</th><th>Título</th><th>Grupo / Semestre</th><th>Tiempo</th><th>Escala</th><th>Pgs</th><th>Estado</th><th>Retro</th><th>PDF</th><th></th></tr></thead><tbody>${
     keys.map(k=>{
       const ex=EXAMENES[k], g=GRUPOS[ex.grupoId]||{};
       const esc=ex.escala||{notaMin:0,notaMax:5,notaApro:3};
@@ -848,6 +849,7 @@ function renderExamenesList(){
         <td>${(ex.preguntas||[]).length}</td>
         <td><label class="toggle-wrap"><label class="toggle"><input type="checkbox" ${ex.activo?'checked':''} onchange="toggleActivo('${k}',this.checked)"><span class="toggle-slider"></span></label><span style="font-size:11px">${ex.activo?'Activo':'Inactivo'}</span></label></td>
         <td><label class="toggle-wrap"><label class="toggle"><input type="checkbox" ${ex.retroAlimentacionVisible?'checked':''} onchange="toggleRetro('${k}',this.checked)"><span class="toggle-slider"></span></label><span style="font-size:11px">${ex.retroAlimentacionVisible?'Visible':'Oculta'}</span></label></td>
+        <td><label class="toggle-wrap"><label class="toggle"><input type="checkbox" ${ex.pdfHabilitado?'checked':''} onchange="togglePDF('${k}',this.checked)"><span class="toggle-slider"></span></label><span style="font-size:11px">${ex.pdfHabilitado?'Habilitado':'Desactivado'}</span></label></td>
         <td style="display:flex;gap:5px;flex-wrap:wrap">
           <button class="btn secondary sm" onclick="verJSON('${k}')">Ver JSON</button>
           <button class="btn warning sm" onclick="editarJSON('${k}')">Editar JSON</button>
@@ -887,6 +889,13 @@ window.toggleActivo=async(id,val)=>{
   const label=toggle.closest('.toggle-wrap').querySelector('span');
   if(label) label.textContent=val?'Activo':'Inactivo';
   toast(val?`"${id}" activado.`:`"${id}" desactivado.`);
+};
+window.togglePDF=async(id,val)=>{
+  await updateDoc(doc(db,'examenes',id),{pdfHabilitado:val});
+  const toggle=event.target;
+  const label=toggle.closest('.toggle-wrap').querySelector('span');
+  if(label) label.textContent=val?'Habilitado':'Desactivado';
+  toast(val?`PDF habilitado para "${id}".`:`PDF desactivado para "${id}".`);
 };
 window.toggleRetro=async(id,val)=>{
   await updateDoc(doc(db,'examenes',id),{retroAlimentacionVisible:val});
@@ -1019,6 +1028,7 @@ window.loadCalificacion=async()=>{
   CAL={examenId:exId,examen,estudiantes:students};
   document.getElementById('btn-excel').style.display=students.length?'block':'none';
   document.getElementById('btn-recalcular').style.display=students.length?'block':'none';
+  document.getElementById('btn-guardar-todas').style.display=students.length?'block':'none';
   document.getElementById('cal-filters').style.display=students.length?'flex':'none';
   renderCalificacion();
 };
@@ -1300,6 +1310,69 @@ function calcPregunta(resp,q){
     default:return 0;
   }
 }
+
+// ── GUARDAR NOTA A TODOS ─────────────────────────────────────
+window.guardarTodasLasNotas = async () => {
+  const {examenId, examen, estudiantes} = CAL;
+  const entregados = estudiantes.filter(s => s.entregado);
+  if (!entregados.length) { toast('No hay estudiantes entregados.', 'warning'); return; }
+
+  // Verificar si hay preguntas manuales sin calificar
+  const preguntas = examen.preguntas || [];
+  const tieneManual = preguntas.some(q => !q.autoCalificable);
+  if (tieneManual) {
+    if (!confirm(`Este examen tiene preguntas manuales. Los estudiantes sin calificación manual recibirán solo el puntaje automático. ¿Continuar con los ${entregados.length} estudiante(s)?`)) return;
+  } else {
+    if (!confirm(`¿Guardar la nota calculada automáticamente para los ${entregados.length} estudiante(s) entregados?`)) return;
+  }
+
+  const esc      = examen.escala || { notaMin:0, notaMax:50, notaApro:30 };
+  const ptsTotal = preguntas.reduce((s,q) => s + q.puntaje, 0);
+  const btn      = document.getElementById('btn-guardar-todas');
+  btn.disabled   = true;
+  btn.textContent= '⏳ Guardando...';
+
+  let guardados = 0, errores = 0;
+
+  for (const s of entregados) {
+    try {
+      const mapa = buildRespMap(s, preguntas);
+      let autoScore = 0, manScore = 0;
+      mapa.forEach(({ pregunta:q, respuesta:r }) => {
+        if (!q) return;
+        if (q.autoCalificable) {
+          autoScore += calcPregunta(r, q);
+        } else {
+          // Usar calificación manual ya guardada si existe
+          const prevMan = (s.calificacionManual || {})[q.id];
+          if (prevMan !== undefined) manScore += prevMan;
+        }
+      });
+      const totalPts  = autoScore + manScore;
+      const notaFinal = parseFloat(Math.min(calcNota(totalPts, ptsTotal, esc), esc.notaMax).toFixed(2));
+
+      await updateDoc(doc(db, 'respuestas', examenId, 'estudiantes', s.id), {
+        calificacion:  notaFinal,
+        puntajeTotal:  parseFloat(totalPts.toFixed(2)),
+      });
+
+      // Actualizar cache
+      const idx = CAL.estudiantes.findIndex(e => e.id === s.id);
+      if (idx >= 0) CAL.estudiantes[idx].calificacion = notaFinal;
+
+      guardados++;
+    } catch(e) {
+      console.error(`Error con ${s.nombre}:`, e);
+      errores++;
+    }
+  }
+
+  btn.disabled   = false;
+  btn.textContent= '💾 Guardar nota a todos';
+
+  toast(`✓ ${guardados} nota(s) guardadas${errores ? ` · ${errores} error(es)` : ''}.`);
+  await loadCalificacion();
+};
 
 // ── RECALCULAR TODOS ──────────────────────────────────────────
 window.recalcularTodos = async () => {
