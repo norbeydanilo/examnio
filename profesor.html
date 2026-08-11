@@ -421,6 +421,9 @@ pre[class*="language-"] {
               <div class="field"><label>Grupo</label><select id="ex-grupo"><option value="">— selecciona —</option></select></div>
               <div class="field"><label>Subtítulo / instrucciones</label><input id="ex-sub" placeholder="ej: Tiempo: 60 min. Responde con cuidado."></div>
             </div>
+            <div class="grid-2">
+              <div class="field"><label>Modalidad</label><select id="ex-modalidad"><option value="individual">Individual</option><option value="parejas">Parejas</option></select><div class="hint">En parejas, el examen pide los datos de los 2 integrantes y genera la contraseña automáticamente. No se puede cambiar después de crear el examen.</div></div>
+            </div>
             <hr>
             <div style="font-size:11px;color:var(--text2);margin-bottom:10px;font-weight:600;text-transform:uppercase;letter-spacing:.4px">Configuración</div>
             <div class="grid-4">
@@ -851,14 +854,16 @@ async function loadExamenes(){
 function renderExamenesList(){
   const el=document.getElementById('examenes-list'), keys=Object.keys(EXAMENES);
   if(!keys.length){el.innerHTML='<div class="empty-state">No hay exámenes.</div>';return;}
-  el.innerHTML=`<div class="table-wrap"><table><thead><tr><th>Código</th><th>Título</th><th>Grupo / Semestre</th><th>Tiempo</th><th>Escala</th><th>Pgs</th><th>Estado</th><th>Retro</th><th>PDF</th><th></th></tr></thead><tbody>${
+  el.innerHTML=`<div class="table-wrap"><table><thead><tr><th>Código</th><th>Título</th><th>Grupo / Semestre</th><th>Modalidad</th><th>Tiempo</th><th>Escala</th><th>Pgs</th><th>Estado</th><th>Retro</th><th>PDF</th><th></th></tr></thead><tbody>${
     keys.map(k=>{
       const ex=EXAMENES[k], g=GRUPOS[ex.grupoId]||{};
       const esc=ex.escala||{notaMin:0,notaMax:5,notaApro:3};
+      const esPareja=ex.modalidad==='parejas';
       return`<tr>
         <td><code style="font-size:10px">${k}</code></td>
         <td>${ex.titulo}</td>
         <td style="font-size:11px;color:var(--text2)">${g.grupo||'—'} / ${g.año||'—'}</td>
+        <td><span class="badge ${esPareja?'badge-purple':'badge-green'}" style="font-size:10px">${esPareja?'👥 Parejas':'Individual'}</span></td>
         <td style="font-size:11px">${ex.tiempoMinutos?ex.tiempoMinutos+' min':'∞'}</td>
         <td style="font-size:11px">${esc.notaMin}–${esc.notaMax} (≥${esc.notaApro})</td>
         <td>${(ex.preguntas||[]).length}</td>
@@ -879,6 +884,7 @@ window.crearExamen=async()=>{
   const notaMin=parseFloat(document.getElementById('ex-nota-min').value)||0;
   const notaMax=parseFloat(document.getElementById('ex-nota-max').value)||5;
   const notaApro=parseFloat(document.getElementById('ex-nota-apro').value)||3;
+  const modalidad=document.getElementById('ex-modalidad').value||'individual';
   if(!titulo||!id||!grupoId){toast('Completa título, código y grupo.','warning');return;}
 
   // Validar ID único por grupo/semestre
@@ -890,9 +896,10 @@ window.crearExamen=async()=>{
   try{const t=document.getElementById('ex-json').value.trim();if(t)preguntas=JSON.parse(t);}
   catch(_){toast('JSON inválido.','danger');return;}
 
-  await setDoc(doc(db,'examenes',id),{titulo,grupoId,subtitulo:sub,preguntas,tiempoMinutos:tiempo,activo:false,retroAlimentacionVisible:false,escala:{notaMin,notaMax,notaApro},creadoEn:serverTimestamp()});
+  await setDoc(doc(db,'examenes',id),{titulo,grupoId,subtitulo:sub,preguntas,tiempoMinutos:tiempo,activo:false,retroAlimentacionVisible:false,modalidad,escala:{notaMin,notaMax,notaApro},creadoEn:serverTimestamp()});
   ['ex-titulo','ex-id','ex-sub','ex-json'].forEach(i=>document.getElementById(i).value='');
   document.getElementById('ex-grupo').value='';
+  document.getElementById('ex-modalidad').value='individual';
   document.getElementById('json-status').textContent='';
   toast('Examen creado: '+id); await loadExamenes(); fillExamenSelects(); poblarFiltros();
 };
@@ -1067,12 +1074,14 @@ function renderMonitor(students,examen){
       tiempoStr=`⏱ ${mins} min`;
     }
 
+    const nombreMostrado=s.codigo2?`${s.nombre} & ${s.nombre2||'—'}`:s.nombre;
+    const codigoMostrado=s.codigo2?`${s.codigo} · ${s.codigo2}`:s.codigo;
     return`<div class="student-card ${cls}" onclick="irACalificacion('${s.id}')">
       <div class="student-top">
-        <div class="student-name">${s.nombre}</div>
+        <div class="student-name">${s.codigo2?'👥 ':''}${nombreMostrado}</div>
         <span class="online-dot" style="background:${dotColor}" title="${s.entregado?'Entregado':online?'En línea':'Desconectado'}"></span>
       </div>
-      <div class="student-meta">${s.codigo}</div>
+      <div class="student-meta">${codigoMostrado}</div>
       ${online&&!s.entregado?'':`<div style="font-size:10px;color:${s.entregado?'var(--accent2)':'var(--danger)'}; margin-bottom:4px">${s.entregado?'✓ Entregado':'⚡ Sin conexión'}</div>`}
       <div style="font-size:11px;margin-bottom:4px">${resp}/${numQ} respondidas</div>
       <div class="prog-bar-bg"><div class="prog-bar-fill" style="width:${pct}%"></div></div>
@@ -1188,7 +1197,7 @@ function renderCalificacion(){
     return`<div class="cal-student-item" id="cal-${s.id}">
       <div class="cal-student-header" onclick="toggleAcordeon('${s.id}',this)">
         <div style="display:flex;flex-direction:column;gap:2px;flex:1">
-          <div style="font-size:13px;font-weight:600">${s.nombre} <span style="font-weight:400;color:var(--text2);font-size:11px">${s.codigo}</span></div>
+          <div style="font-size:13px;font-weight:600">${s.codigo2?'👥 ':''}${s.nombre}${s.codigo2?` & ${s.nombre2||'—'}`:''} <span style="font-weight:400;color:var(--text2);font-size:11px">${s.codigo}${s.codigo2?' · '+s.codigo2:''}</span></div>
           <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
             ${s.entregado?'<span class="badge badge-green">Entregado</span>':'<span class="badge badge-yellow">En progreso</span>'}
             ${s.entregadoForzado?'<span class="badge badge-yellow">Tiempo agotado</span>':''}
@@ -1524,12 +1533,19 @@ window.descargarExcel=()=>{
   if(!estudiantes.length){toast('Sin datos.','warning');return;}
   const esc=examen.escala||{notaMin:0,notaMax:5,notaApro:3};
   const ptsTotal=(examen.preguntas||[]).reduce((s,q)=>s+q.puntaje,0);
-  const rows=[['Nombre','Correo','Código','Entregado','Forzado','Pts obtenidos','Pts totales','Nota','Aprueba','Eventos','Desconexiones','Inicio','Fin']];
+  const rows=[['Nombre','Correo','Código','Modalidad','Entregado','Forzado','Pts obtenidos','Pts totales','Nota','Aprueba','Eventos','Desconexiones','Inicio','Fin']];
   estudiantes.forEach(s=>{
     const auto=calcAuto(s.respuestas||{},s,examen.preguntas||[]);
     const nota=s.calificacion!==null&&s.calificacion!==undefined?s.calificacion:calcNota(auto,ptsTotal,esc);
     const fmtTs=ts=>{if(!ts)return'—';try{if(ts.toDate)return ts.toDate().toLocaleString('es-CO');if(ts.seconds)return new Date(ts.seconds*1000).toLocaleString('es-CO');}catch(_){}return'—';};
-    rows.push([s.nombre,s.correo||'',s.codigo,s.entregado?'Sí':'No',s.entregadoForzado?'Sí':'No',auto.toFixed(2),ptsTotal,nota,nota>=esc.notaApro?'Sí':'No',(s.eventos||[]).length,(s.desconexiones||[]).length,fmtTs(s.inicio),fmtTs(s.fin)]);
+    const comunes=[s.entregado?'Sí':'No',s.entregadoForzado?'Sí':'No',auto.toFixed(2),ptsTotal,nota,nota>=esc.notaApro?'Sí':'No',(s.eventos||[]).length,(s.desconexiones||[]).length,fmtTs(s.inicio),fmtTs(s.fin)];
+    if(s.codigo2){
+      // Examen en pareja: una fila por cada integrante, con la misma nota compartida
+      rows.push([s.nombre,s.correo||'',s.codigo,'Parejas',...comunes]);
+      rows.push([s.nombre2||'',s.correo2||'',s.codigo2,'Parejas',...comunes]);
+    } else {
+      rows.push([s.nombre,s.correo||'',s.codigo,'Individual',...comunes]);
+    }
   });
   const csv=rows.map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
   const blob=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8;'});

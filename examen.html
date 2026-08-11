@@ -482,16 +482,51 @@ pre[class*="language-"] {
       </div>
       <div class="field">
         <label>Código del examen</label>
-        <input type="text" id="n-examen" placeholder="ej: POO-P1-2024" autocomplete="off" style="text-transform:uppercase">
+        <input type="text" id="n-examen" placeholder="ej: POO-P1-2024" autocomplete="off" style="text-transform:uppercase" onblur="checkModalidadNuevo()">
         <div class="hint">Proporcionado por el profesor al inicio</div>
       </div>
-      <div class="field">
+
+      <div class="field" id="modalidad-info" style="display:none;">
+        <div class="hint" style="background:rgba(124,92,191,.12);border:1px solid var(--accent2);border-radius:8px;padding:10px 12px;color:var(--accent2);font-weight:600;">👥 Este examen se presenta en parejas.</div>
+      </div>
+
+      <div class="field" id="modo-registro-toggle" style="display:none;">
+        <label>¿Cómo vas a presentar?</label>
+        <div style="display:flex;gap:10px;">
+          <button type="button" id="btn-modo-pareja" onclick="setModoRegistro('parejas')" style="flex:1;padding:12px;border-radius:8px;border:2px solid var(--accent2);background:rgba(124,92,191,.15);color:var(--accent2);font-family:var(--font);font-size:13px;font-weight:600;cursor:pointer;transition:all .15s;">👥 En pareja</button>
+          <button type="button" id="btn-modo-individual" onclick="setModoRegistro('individual')" style="flex:1;padding:12px;border-radius:8px;border:2px solid var(--border);background:var(--surface2);color:var(--text);font-family:var(--font);font-size:13px;font-weight:600;cursor:pointer;transition:all .15s;">👤 Solo (individual)</button>
+        </div>
+        <div class="hint">Si te corresponde presentar solo (número impar, no tienes pareja, etc.), elige "Solo".</div>
+      </div>
+
+      <div id="pareja-fields" style="display:none;">
+        <hr style="border:none;border-top:1px solid var(--border);margin:20px 0 16px;">
+        <div style="font-size:11px;color:var(--text2);margin-bottom:12px;letter-spacing:.5px;text-transform:uppercase;font-weight:600;">Integrante 2</div>
+        <div class="field">
+          <label>Nombre completo</label>
+          <input type="text" id="n2-nombre" placeholder="ej: Juan Pérez López" autocomplete="off">
+        </div>
+        <div class="field">
+          <label>Correo institucional</label>
+          <input type="email" id="n2-correo" placeholder="ej: juan.perez@universidad.edu.co" autocomplete="off">
+        </div>
+        <div class="field">
+          <label>Código estudiantil</label>
+          <input type="text" id="n2-codigo" placeholder="ej: 1007654321" autocomplete="off">
+        </div>
+        <hr style="border:none;border-top:1px solid var(--border);margin:20px 0 16px;">
+      </div>
+
+      <div class="field" id="field-pass-nuevo">
         <label>Crea tu contraseña de sesión</label>
         <div class="input-wrap">
           <input type="password" id="n-pass" placeholder="Mínimo 4 caracteres — la necesitarás si recargas" autocomplete="new-password">
           <button class="toggle-pass" onclick="togglePass('n-pass',this)" type="button">👁</button>
         </div>
         <div class="hint">⚠ Recuérdala — la usarás si necesitas recargar la página</div>
+      </div>
+      <div class="field" id="field-pass-pareja-info" style="display:none;">
+        <div class="hint" style="background:rgba(79,142,247,.1);border:1px solid var(--accent);border-radius:8px;padding:10px 12px;color:var(--accent);">🔑 La contraseña de sesión se generará automáticamente al iniciar y se mostrará en pantalla — anótenla, la necesitarán ambos integrantes para consultar resultados.</div>
       </div>
       <button class="btn-submit" id="btn-nuevo" onclick="doLoginNuevo()">Iniciar examen</button>
       <div class="error-msg" id="error-nuevo"></div>
@@ -505,7 +540,7 @@ pre[class*="language-"] {
     <div class="login-card">
       <span class="back-link" onclick="goTo('landing')">← Volver</span>
       <h1>Continuar / Ver resultados</h1>
-      <p style="color:var(--text2);font-size:13px;margin-bottom:24px">Ingresa tus datos para continuar tu examen o ver tu retroalimentación</p>
+      <p style="color:var(--text2);font-size:13px;margin-bottom:24px">Ingresa tus datos para continuar tu examen o ver tu retroalimentación. Si presentaste en pareja, ingresa tus propios datos con la contraseña compartida del equipo.</p>
 
       <div class="field">
         <label>Código estudiantil</label>
@@ -610,6 +645,17 @@ pre[class*="language-"] {
   </div>
 </div>
 
+<!-- ══ OVERLAY: CONTRASEÑA DE PAREJA ══ -->
+<div id="pareja-pass-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.9);z-index:400;align-items:center;justify-content:center;padding:20px;">
+  <div class="timeup-box" style="border-color:var(--accent2);max-width:440px;">
+    <div style="font-size:38px;margin-bottom:10px;">🔑</div>
+    <h2 style="color:var(--accent2);">Contraseña del equipo</h2>
+    <p style="color:var(--text2);font-size:13px;margin-bottom:18px;line-height:1.6;">Esta es la contraseña de sesión compartida. <strong style="color:var(--text)">Anótenla los dos</strong> — la necesitarán para consultar resultados o continuar el examen más adelante.</p>
+    <div style="background:var(--surface2);border:2px dashed var(--accent2);border-radius:10px;padding:16px;font-family:var(--mono);font-size:26px;font-weight:700;letter-spacing:5px;color:var(--accent2);margin-bottom:18px;" id="pareja-pass-display"></div>
+    <button class="btn-submit" style="width:auto;padding:12px 28px;" onclick="confirmarPasswordPareja()">Ya la anotamos, continuar →</button>
+  </div>
+</div>
+
 <!-- Prism.js -->
 <script>
 // Prism: no autoprocess — lo llamamos manualmente
@@ -657,12 +703,63 @@ if (MODO_PRUEBA) {
 // ── Estado ────────────────────────────────────────────────────
 let S = {
   examenId:null, examenData:null, preguntas:[],
-  estudiante:null, respDocId:null,
+  estudiante:null, primario:null, respDocId:null,
   respuestas:{}, eventos:[], currentIdx:0, entregado:false,
   timerInterval:null, secondsLeft:0, eventAlertCount:0,
   _passHash:null,
 };
 let pendingNext = false; // para el modal de sin respuesta
+let modalidadDetectada = 'individual'; // modalidad configurada por el profesor para el examen
+let modoRegistro = 'parejas';          // elección del estudiante cuando el examen es de parejas: 'parejas' | 'individual'
+let pendingIniciarUI = null; // callback diferido mientras se muestra la contraseña de pareja
+
+// ── Generador de contraseña de sesión para parejas ─────────────
+function genPass(len=6) {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // sin 0/O ni 1/I para evitar confusiones
+  let out = '';
+  for (let i=0; i<len; i++) out += chars[Math.floor(Math.random()*chars.length)];
+  return out;
+}
+
+// ── El estudiante elige presentar en pareja o solo (si el examen es de parejas) ──
+window.setModoRegistro = (modo) => {
+  modoRegistro = modo;
+  const btnPareja = document.getElementById('btn-modo-pareja');
+  const btnIndiv  = document.getElementById('btn-modo-individual');
+  const activo    = {border:'2px solid var(--accent2)',background:'rgba(124,92,191,.15)',color:'var(--accent2)'};
+  const inactivo  = {border:'2px solid var(--border)',background:'var(--surface2)',color:'var(--text)'};
+  const set = (el, styleObj) => { Object.assign(el.style, styleObj); };
+  if (modo === 'parejas') { set(btnPareja, activo); set(btnIndiv, inactivo); }
+  else { set(btnIndiv, activo); set(btnPareja, inactivo); }
+  aplicarVisibilidadModalidad();
+};
+
+function aplicarVisibilidadModalidad() {
+  const esPareja = modalidadDetectada === 'parejas' && modoRegistro === 'parejas';
+  document.getElementById('pareja-fields').style.display        = esPareja ? 'block' : 'none';
+  document.getElementById('field-pass-nuevo').style.display      = esPareja ? 'none'  : 'block';
+  document.getElementById('field-pass-pareja-info').style.display = esPareja ? 'block' : 'none';
+}
+
+// ── Detectar modalidad del examen al escribir su código ────────
+window.checkModalidadNuevo = async () => {
+  const exCod = document.getElementById('n-examen').value.trim().toUpperCase();
+  const modInfo   = document.getElementById('modalidad-info');
+  const modoToggle = document.getElementById('modo-registro-toggle');
+  if (!exCod) { modalidadDetectada = 'individual'; }
+  else {
+    try {
+      const snap = await getDoc(doc(db,'examenes',exCod));
+      modalidadDetectada = (snap.exists() && snap.data().modalidad === 'parejas') ? 'parejas' : 'individual';
+    } catch(_) { modalidadDetectada = 'individual'; }
+  }
+  const esExamenPareja = modalidadDetectada === 'parejas';
+  modInfo.style.display    = esExamenPareja ? 'block' : 'none';
+  modoToggle.style.display = esExamenPareja ? 'block' : 'none';
+  modoRegistro = 'parejas'; // por defecto, si el examen es de parejas se asume que presentan en pareja
+  if (esExamenPareja) window.setModoRegistro('parejas');
+  else aplicarVisibilidadModalidad();
+};
 
 const LS = () => `ex_${S.examenId}_${S.respDocId}`;
 
@@ -722,28 +819,48 @@ window.doLoginNuevo = async () => {
   const correo  = document.getElementById('n-correo').value.trim();
   const codigo  = document.getElementById('n-codigo').value.trim();
   const exCod   = document.getElementById('n-examen').value.trim().toUpperCase();
-  const pass    = document.getElementById('n-pass').value;
   const errEl   = document.getElementById('error-nuevo');
   const btn     = document.getElementById('btn-nuevo');
+  const esPareja = modalidadDetectada === 'parejas' && modoRegistro === 'parejas';
+  const pass    = esPareja ? genPass() : document.getElementById('n-pass').value;
+
+  let nombre2='', correo2='', codigo2='';
+  if (esPareja) {
+    nombre2 = document.getElementById('n2-nombre').value.trim();
+    correo2 = document.getElementById('n2-correo').value.trim();
+    codigo2 = document.getElementById('n2-codigo').value.trim();
+  }
 
   errEl.style.display = 'none';
-  if (!nombre||!correo||!codigo||!exCod||!pass) {
+  if (!nombre||!correo||!codigo||!exCod) {
     errEl.textContent='Completa todos los campos.'; errEl.style.display='block'; return;
   }
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  if (!emailRegex.test(correo)) {
-    errEl.textContent='Ingresa un correo electrónico válido.'; errEl.style.display='block'; return;
+  if (esPareja && (!nombre2||!correo2||!codigo2)) {
+    errEl.textContent='Completa los datos del integrante 2.'; errEl.style.display='block'; return;
   }
-  if (pass.length < 4) {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(correo) || (esPareja && !emailRegex.test(correo2))) {
+    errEl.textContent='Ingresa correos electrónicos válidos.'; errEl.style.display='block'; return;
+  }
+  if (esPareja && codigo2 === codigo) {
+    errEl.textContent='Los códigos de los dos integrantes deben ser diferentes.'; errEl.style.display='block'; return;
+  }
+  if (!esPareja && pass.length < 4) {
     errEl.textContent='La contraseña debe tener al menos 4 caracteres.'; errEl.style.display='block'; return;
   }
   btn.disabled=true; btn.innerHTML='<span class="spinner"></span>';
   try {
-    await iniciarSesion({ nombre, correo, codigo, exCod, pass, esNuevo: true });
+    await iniciarSesion({ nombre, correo, codigo, exCod, pass, esNuevo: true, esPareja, nombre2, correo2, codigo2 });
   } catch(e) {
     errEl.textContent = e.message; errEl.style.display='block';
     btn.disabled=false; btn.textContent='Iniciar examen';
   }
+};
+
+// ── Confirmar contraseña de pareja vista ────────────────────────
+window.confirmarPasswordPareja = () => {
+  document.getElementById('pareja-pass-overlay').style.display = 'none';
+  if (typeof pendingIniciarUI === 'function') { pendingIniciarUI(); pendingIniciarUI = null; }
 };
 
 // ── LOGIN CONTINUAR ───────────────────────────────────────────
@@ -772,7 +889,7 @@ window.doLoginContinuar = async () => {
 };
 
 // ── LÓGICA COMÚN DE SESIÓN ────────────────────────────────────
-async function iniciarSesion({ nombre, correo, codigo, exCod, pass, esNuevo }) {
+async function iniciarSesion({ nombre, correo, codigo, exCod, pass, esNuevo, esPareja, nombre2, correo2, codigo2 }) {
   // 1. Verificar examen — si está inactivo pero hay retro activa, permitir ver retro
   const exSnap = await getDoc(doc(db,'examenes',exCod));
   if (!exSnap.exists()) throw new Error('Código de examen no válido.');
@@ -787,6 +904,7 @@ async function iniciarSesion({ nombre, correo, codigo, exCod, pass, esNuevo }) {
   if (esNuevo) {
     if (!exData.activo && esNuevo) throw new Error('Este examen no está activo aún. Espera al profesor.');
     S.estudiante = { nombre, correo, codigo };
+    S.primario   = { nombre, correo, codigo };
     respDocId    = `${codigo}-${nombre.replace(/\s+/g,'-').toLowerCase()}`;
   } else {
     // Para continuar: buscar el doc por código en Firebase
@@ -800,10 +918,12 @@ async function iniciarSesion({ nombre, correo, codigo, exCod, pass, esNuevo }) {
       respDocId = lsKeys[0].replace(`ex_${exCod}_`, '');
     } else {
       // No está en localStorage — buscar en Firestore por código de estudiante
+      // (en modo parejas, el código puede corresponder al integrante 1 o al integrante 2)
       const estudiantesSnap = await getDocs(collection(db, 'respuestas', exCod, 'estudiantes'));
       let encontrado = null;
       estudiantesSnap.forEach(d => {
-        if (d.data().codigo === codigo) encontrado = d.id;
+        const dd = d.data();
+        if (dd.codigo === codigo || dd.codigo2 === codigo) encontrado = d.id;
       });
       if (!encontrado) {
         throw new Error('No se encontró tu intento. Usa "Empezar examen" si es tu primera vez.');
@@ -831,8 +951,17 @@ async function iniciarSesion({ nombre, correo, codigo, exCod, pass, esNuevo }) {
         throw new Error('Contraseña incorrecta.');
       }
     }
-    if (!esNuevo && !S.estudiante) {
-      S.estudiante = { nombre: existing.nombre, correo: existing.correo||'', codigo };
+    if (!esNuevo) {
+      // El registro (nombre/código/correo "principales") nunca cambia al continuar
+      S.primario = { nombre: existing.nombre, correo: existing.correo||'', codigo: existing.codigo };
+      if (!S.estudiante) {
+        // Identificar cuál de los dos integrantes está consultando (modo parejas)
+        if (existing.codigo2 && existing.codigo2 === codigo) {
+          S.estudiante = { nombre: existing.nombre2, correo: existing.correo2||'', codigo: existing.codigo2 };
+        } else {
+          S.estudiante = { nombre: existing.nombre, correo: existing.correo||'', codigo: existing.codigo };
+        }
+      }
     }
     if (existing.entregado) {
       document.getElementById('finish-name').textContent = S.estudiante.nombre;
@@ -876,9 +1005,9 @@ async function iniciarSesion({ nombre, correo, codigo, exCod, pass, esNuevo }) {
 
   // 5. Crear/actualizar doc en Firebase
   const docData = {
-    nombre: S.estudiante.nombre,
-    correo: S.estudiante.correo||'',
-    codigo,
+    nombre: S.primario.nombre,
+    correo: S.primario.correo||'',
+    codigo: S.primario.codigo,
     passHash,
     inicio: serverTimestamp(),
     entregado: false,
@@ -887,19 +1016,35 @@ async function iniciarSesion({ nombre, correo, codigo, exCod, pass, esNuevo }) {
     calificacion: null,
     ordenPreguntas,
   };
+  if (esNuevo && esPareja) {
+    docData.esPareja = true;
+    docData.nombre2  = nombre2;
+    docData.correo2  = correo2;
+    docData.codigo2  = codigo2;
+  }
   await setDoc(ref, docData, { merge: true });
 
-  // 6. Iniciar UI
-  if (!MODO_PRUEBA) { setupEvents(); startHeartbeat(); }
-  renderHeader();
-  startTimer();
-  renderQuestion(S.currentIdx);
+  // 6. Iniciar UI (se difiere si hay que mostrar la contraseña de pareja primero)
+  const iniciarUI = () => {
+    if (!MODO_PRUEBA) { setupEvents(); startHeartbeat(); }
+    renderHeader();
+    startTimer();
+    renderQuestion(S.currentIdx);
 
-  document.getElementById('student-name-top').textContent   = S.estudiante.nombre;
-  document.getElementById('student-name-label').textContent = S.estudiante.nombre;
-  if (S.eventos.length > 0) updateAlertWidget();
-  showPage('page-exam');
-  window.location.hash = 'exam';
+    document.getElementById('student-name-top').textContent   = S.estudiante.nombre;
+    document.getElementById('student-name-label').textContent = S.estudiante.nombre;
+    if (S.eventos.length > 0) updateAlertWidget();
+    showPage('page-exam');
+    window.location.hash = 'exam';
+  };
+
+  if (esNuevo && esPareja) {
+    document.getElementById('pareja-pass-display').textContent = pass;
+    document.getElementById('pareja-pass-overlay').style.display = 'flex';
+    pendingIniciarUI = iniciarUI;
+  } else {
+    iniciarUI();
+  }
 }
 
 // ── TIMER ─────────────────────────────────────────────────────
@@ -1330,7 +1475,13 @@ window.verRetroalimentacion = async () => {
     const esc2=examen.escala||{notaMin:0,notaMax:5,notaApro:3};
     const ptsTotal=preguntas.reduce((s,q)=>s+q.puntaje,0);
     document.getElementById('retro-title').textContent=examen.titulo||'Retroalimentación';
-    document.getElementById('retro-subtitle').textContent=S.estudiante.nombre;
+    let retroSubt = S.estudiante.nombre;
+    if (estudiante.esPareja) {
+      const esEst2 = estudiante.codigo2 && estudiante.codigo2 === S.estudiante.codigo;
+      const companero = esEst2 ? estudiante.nombre : estudiante.nombre2;
+      if (companero) retroSubt += '  ·  en pareja con: ' + companero;
+    }
+    document.getElementById('retro-subtitle').textContent = retroSubt;
 
     // Nota
     const nota=estudiante.calificacion, ptsObt=estudiante.puntajeTotal;
@@ -1580,6 +1731,18 @@ window.descargarPDFRetro = async () => {
 
     const examen     = exSnap.data();
     const estudiante = respSnap.data();
+
+    // Personalizar identidad: si el examen fue en pareja, el PDF muestra
+    // los datos de quien está consultando (S.estudiante), no un dato genérico.
+    let companeroNombre = null;
+    if (estudiante.esPareja) {
+      const esEst2 = estudiante.codigo2 && estudiante.codigo2 === S.estudiante.codigo;
+      companeroNombre = esEst2 ? estudiante.nombre : estudiante.nombre2;
+      estudiante.nombre = S.estudiante.nombre;
+      estudiante.codigo = S.estudiante.codigo;
+      estudiante.correo = S.estudiante.correo || '';
+    }
+
     const preguntas  = examen.preguntas || [];
     const respuestas = estudiante.respuestas || {};
     const esc        = examen.escala || { notaMin:0, notaMax:50, notaApro:30 };
@@ -1707,15 +1870,20 @@ window.descargarPDFRetro = async () => {
     y = 48;
 
     // ── ESTUDIANTE ───────────────────────────────────────────
-    chk(34);
-    block(y, 32, SURF2);
-    accentBar(y, 32, ACCENT);
+    const estBoxH = companeroNombre ? 38 : 32;
+    chk(estBoxH+2);
+    block(y, estBoxH, SURF2);
+    accentBar(y, estBoxH, ACCENT);
 
     sf(6.5, true, ACCENT);    pdf.text('ESTUDIANTE', M+6, y+7);
     sf(11,  true, TEXT);      pdf.text(clean(estudiante.nombre||'-'), M+6, y+14);
     sf(8,   false, TEXT2);    pdf.text('Codigo: '+clean(estudiante.codigo||'-'), M+6, y+21);
     pdf.text('Correo: '+clean(estudiante.correo||'-'), M+6, y+26);
-    y += 38;
+    if (companeroNombre) {
+      sf(7.5, false, ACCENT2);
+      pdf.text('Examen presentado en pareja con: '+clean(companeroNombre), M+6, y+32);
+    }
+    y += estBoxH+6;
 
     // ── METADATA ─────────────────────────────────────────────
     chk(12);
