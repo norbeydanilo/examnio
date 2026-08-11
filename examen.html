@@ -469,18 +469,6 @@ pre[class*="language-"] {
       <p style="color:var(--text2);font-size:13px;margin-bottom:24px">Primera vez que ingresas a este examen</p>
 
       <div class="field">
-        <label>Nombre completo</label>
-        <input type="text" id="n-nombre" placeholder="ej: Ana María Torres Ruiz" autocomplete="off">
-      </div>
-      <div class="field">
-        <label>Correo institucional</label>
-        <input type="email" id="n-correo" placeholder="ej: ana.torres@universidad.edu.co" autocomplete="off">
-      </div>
-      <div class="field">
-        <label>Código estudiantil</label>
-        <input type="text" id="n-codigo" placeholder="ej: 1001234567" autocomplete="off">
-      </div>
-      <div class="field">
         <label>Código del examen</label>
         <input type="text" id="n-examen" placeholder="ej: POO-P1-2024" autocomplete="off" style="text-transform:uppercase" onblur="checkModalidadNuevo()">
         <div class="hint">Proporcionado por el profesor al inicio</div>
@@ -499,12 +487,35 @@ pre[class*="language-"] {
         <div class="hint">Si te corresponde presentar solo (número impar, no tienes pareja, etc.), elige "Solo".</div>
       </div>
 
+      <hr style="border:none;border-top:1px solid var(--border);margin:20px 0 16px;">
+
+      <div class="field">
+        <label>Apellidos</label>
+        <input type="text" id="n-apellidos" placeholder="ej: Torres Ruiz" autocomplete="off">
+      </div>
+      <div class="field">
+        <label>Nombres</label>
+        <input type="text" id="n-nombres" placeholder="ej: Ana María" autocomplete="off">
+      </div>
+      <div class="field">
+        <label>Correo institucional</label>
+        <input type="email" id="n-correo" placeholder="ej: ana.torres@universidad.edu.co" autocomplete="off">
+      </div>
+      <div class="field">
+        <label>Código estudiantil</label>
+        <input type="text" id="n-codigo" placeholder="ej: 1001234567" autocomplete="off">
+      </div>
+
       <div id="pareja-fields" style="display:none;">
         <hr style="border:none;border-top:1px solid var(--border);margin:20px 0 16px;">
         <div style="font-size:11px;color:var(--text2);margin-bottom:12px;letter-spacing:.5px;text-transform:uppercase;font-weight:600;">Integrante 2</div>
         <div class="field">
-          <label>Nombre completo</label>
-          <input type="text" id="n2-nombre" placeholder="ej: Juan Pérez López" autocomplete="off">
+          <label>Apellidos</label>
+          <input type="text" id="n2-apellidos" placeholder="ej: Pérez López" autocomplete="off">
+        </div>
+        <div class="field">
+          <label>Nombres</label>
+          <input type="text" id="n2-nombres" placeholder="ej: Juan" autocomplete="off">
         </div>
         <div class="field">
           <label>Correo institucional</label>
@@ -587,6 +598,7 @@ pre[class*="language-"] {
       <div class="finish-icon">✅</div>
       <h2>Examen entregado</h2>
       <p id="finish-name"></p>
+      <p id="finish-eventos" style="font-size:12px;color:var(--text2);margin-top:6px;"></p>
       <div class="score-display" id="score-display" style="display:none">
         <div class="score-box">
           <div class="val" id="finish-pts">—</div>
@@ -703,22 +715,49 @@ if (MODO_PRUEBA) {
 // ── Estado ────────────────────────────────────────────────────
 let S = {
   examenId:null, examenData:null, preguntas:[],
-  estudiante:null, primario:null, respDocId:null,
+  estudiante:null, primario:null, secundario:null, respDocId:null,
   respuestas:{}, eventos:[], currentIdx:0, entregado:false,
   timerInterval:null, secondsLeft:0, eventAlertCount:0,
   _passHash:null,
 };
+// Devuelve el/los nombre(s) a mostrar en pantalla: ambos si es examen en pareja, uno si es individual
+function nombresParaMostrar() {
+  if (S.secundario && S.secundario.nombre) {
+    return `${S.primario.nombre}  &  ${S.secundario.nombre}`;
+  }
+  return S.estudiante ? S.estudiante.nombre : '';
+}
+// Muestra en la pantalla de "Examen entregado" la cantidad de eventos sospechosos registrados
+function mostrarResumenEventos(eventos) {
+  const el = document.getElementById('finish-eventos');
+  if (!el) return;
+  const n = (eventos||[]).length;
+  el.textContent = n>0
+    ? `⚠ ${n} evento${n!==1?'s':''} sospechoso${n!==1?'s':''} registrado${n!==1?'s':''} durante el examen.`
+    : '✓ Sin eventos sospechosos registrados.';
+  el.style.color = n>0 ? 'var(--warning)' : 'var(--text2)';
+}
 let pendingNext = false; // para el modal de sin respuesta
 let modalidadDetectada = 'individual'; // modalidad configurada por el profesor para el examen
 let modoRegistro = 'parejas';          // elección del estudiante cuando el examen es de parejas: 'parejas' | 'individual'
 let pendingIniciarUI = null; // callback diferido mientras se muestra la contraseña de pareja
 
 // ── Generador de contraseña de sesión para parejas ─────────────
+// Alfanumérica con símbolo, ej: H4QzN* — garantiza mayúscula, minúscula, dígito y símbolo.
 function genPass(len=6) {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // sin 0/O ni 1/I para evitar confusiones
-  let out = '';
-  for (let i=0; i<len; i++) out += chars[Math.floor(Math.random()*chars.length)];
-  return out;
+  const upper   = 'ABCDEFGHJKLMNPQRSTUVWXYZ'; // sin I/O para evitar confusiones
+  const lower   = 'abcdefghijkmnpqrstuvwxyz'; // sin l/o
+  const digits  = '23456789';                 // sin 0/1
+  const symbols = '*+-?#@';
+  const all = upper + lower + digits + symbols;
+  const pick = set => set[Math.floor(Math.random()*set.length)];
+  let chars = [pick(upper), pick(lower), pick(digits), pick(symbols)];
+  while (chars.length < len) chars.push(pick(all));
+  for (let i=chars.length-1; i>0; i--) { // barajar
+    const j = Math.floor(Math.random()*(i+1));
+    [chars[i],chars[j]] = [chars[j],chars[i]];
+  }
+  return chars.join('');
 }
 
 // ── El estudiante elige presentar en pareja o solo (si el examen es de parejas) ──
@@ -815,7 +854,9 @@ window.togglePass = (inputId, btn) => {
 
 // ── LOGIN NUEVO ───────────────────────────────────────────────
 window.doLoginNuevo = async () => {
-  const nombre  = document.getElementById('n-nombre').value.trim();
+  const apellidos = document.getElementById('n-apellidos').value.trim();
+  const nombres   = document.getElementById('n-nombres').value.trim();
+  const nombre    = [apellidos, nombres].filter(Boolean).join(' ');
   const correo  = document.getElementById('n-correo').value.trim();
   const codigo  = document.getElementById('n-codigo').value.trim();
   const exCod   = document.getElementById('n-examen').value.trim().toUpperCase();
@@ -826,13 +867,18 @@ window.doLoginNuevo = async () => {
 
   let nombre2='', correo2='', codigo2='';
   if (esPareja) {
-    nombre2 = document.getElementById('n2-nombre').value.trim();
+    const apellidos2 = document.getElementById('n2-apellidos').value.trim();
+    const nombres2   = document.getElementById('n2-nombres').value.trim();
+    nombre2 = [apellidos2, nombres2].filter(Boolean).join(' ');
     correo2 = document.getElementById('n2-correo').value.trim();
     codigo2 = document.getElementById('n2-codigo').value.trim();
   }
 
   errEl.style.display = 'none';
-  if (!nombre||!correo||!codigo||!exCod) {
+  if (!exCod) {
+    errEl.textContent='Ingresa el código del examen.'; errEl.style.display='block'; return;
+  }
+  if (!apellidos||!nombres||!correo||!codigo) {
     errEl.textContent='Completa todos los campos.'; errEl.style.display='block'; return;
   }
   if (esPareja && (!nombre2||!correo2||!codigo2)) {
@@ -856,6 +902,7 @@ window.doLoginNuevo = async () => {
     btn.disabled=false; btn.textContent='Iniciar examen';
   }
 };
+
 
 // ── Confirmar contraseña de pareja vista ────────────────────────
 window.confirmarPasswordPareja = () => {
@@ -905,6 +952,7 @@ async function iniciarSesion({ nombre, correo, codigo, exCod, pass, esNuevo, esP
     if (!exData.activo && esNuevo) throw new Error('Este examen no está activo aún. Espera al profesor.');
     S.estudiante = { nombre, correo, codigo };
     S.primario   = { nombre, correo, codigo };
+    S.secundario = esPareja ? { nombre: nombre2, correo: correo2, codigo: codigo2 } : null;
     respDocId    = `${codigo}-${nombre.replace(/\s+/g,'-').toLowerCase()}`;
   } else {
     // Para continuar: buscar el doc por código en Firebase
@@ -953,7 +1001,8 @@ async function iniciarSesion({ nombre, correo, codigo, exCod, pass, esNuevo, esP
     }
     if (!esNuevo) {
       // El registro (nombre/código/correo "principales") nunca cambia al continuar
-      S.primario = { nombre: existing.nombre, correo: existing.correo||'', codigo: existing.codigo };
+      S.primario   = { nombre: existing.nombre, correo: existing.correo||'', codigo: existing.codigo };
+      S.secundario = existing.codigo2 ? { nombre: existing.nombre2||'', correo: existing.correo2||'', codigo: existing.codigo2 } : null;
       if (!S.estudiante) {
         // Identificar cuál de los dos integrantes está consultando (modo parejas)
         if (existing.codigo2 && existing.codigo2 === codigo) {
@@ -964,7 +1013,8 @@ async function iniciarSesion({ nombre, correo, codigo, exCod, pass, esNuevo, esP
       }
     }
     if (existing.entregado) {
-      document.getElementById('finish-name').textContent = S.estudiante.nombre;
+      document.getElementById('finish-name').textContent = nombresParaMostrar();
+      mostrarResumenEventos(existing.eventos||[]);
       showPage('page-finish');
       checkRetroDisponible();
       return;
@@ -980,7 +1030,8 @@ async function iniciarSesion({ nombre, correo, codigo, exCod, pass, esNuevo, esP
   if (saved) {
     const p = JSON.parse(saved);
     if (p.entregado) {
-      document.getElementById('finish-name').textContent = S.estudiante.nombre;
+      document.getElementById('finish-name').textContent = nombresParaMostrar();
+      mostrarResumenEventos(p.eventos || S.eventos);
       showPage('page-finish'); checkRetroDisponible(); return;
     }
     if (Object.keys(p.respuestas||{}).length > Object.keys(S.respuestas).length) {
@@ -1031,8 +1082,8 @@ async function iniciarSesion({ nombre, correo, codigo, exCod, pass, esNuevo, esP
     startTimer();
     renderQuestion(S.currentIdx);
 
-    document.getElementById('student-name-top').textContent   = S.estudiante.nombre;
-    document.getElementById('student-name-label').textContent = S.estudiante.nombre;
+    document.getElementById('student-name-top').textContent   = nombresParaMostrar();
+    document.getElementById('student-name-label').textContent = nombresParaMostrar();
     if (S.eventos.length > 0) updateAlertWidget();
     showPage('page-exam');
     window.location.hash = 'exam';
@@ -1316,7 +1367,8 @@ window.finishExam = async (forced=false) => {
   }catch(_){}
 
   // Mostrar pantalla de finalización con puntos y nota
-  document.getElementById('finish-name').textContent=S.estudiante.nombre;
+  document.getElementById('finish-name').textContent=nombresParaMostrar();
+  mostrarResumenEventos(S.eventos);
   document.getElementById('finish-pts').textContent=ptsAuto.toFixed(2);
   document.getElementById('finish-pts-max').textContent=ptsTotal.toFixed(2);
   document.getElementById('finish-nota').textContent=notaCalc.toFixed(2);
@@ -1479,7 +1531,8 @@ window.verRetroalimentacion = async () => {
     if (estudiante.esPareja) {
       const esEst2 = estudiante.codigo2 && estudiante.codigo2 === S.estudiante.codigo;
       const companero = esEst2 ? estudiante.nombre : estudiante.nombre2;
-      if (companero) retroSubt += '  ·  en pareja con: ' + companero;
+      const companeroCod = esEst2 ? estudiante.codigo : estudiante.codigo2;
+      if (companero) retroSubt += '  ·  en pareja con: ' + companero + (companeroCod ? ' (' + companeroCod + ')' : '');
     }
     document.getElementById('retro-subtitle').textContent = retroSubt;
 
@@ -1735,9 +1788,11 @@ window.descargarPDFRetro = async () => {
     // Personalizar identidad: si el examen fue en pareja, el PDF muestra
     // los datos de quien está consultando (S.estudiante), no un dato genérico.
     let companeroNombre = null;
+    let companeroCodigo = null;
     if (estudiante.esPareja) {
       const esEst2 = estudiante.codigo2 && estudiante.codigo2 === S.estudiante.codigo;
-      companeroNombre = esEst2 ? estudiante.nombre : estudiante.nombre2;
+      companeroNombre = esEst2 ? estudiante.nombre  : estudiante.nombre2;
+      companeroCodigo = esEst2 ? estudiante.codigo  : estudiante.codigo2;
       estudiante.nombre = S.estudiante.nombre;
       estudiante.codigo = S.estudiante.codigo;
       estudiante.correo = S.estudiante.correo || '';
@@ -1881,7 +1936,7 @@ window.descargarPDFRetro = async () => {
     pdf.text('Correo: '+clean(estudiante.correo||'-'), M+6, y+26);
     if (companeroNombre) {
       sf(7.5, false, ACCENT2);
-      pdf.text('Examen presentado en pareja con: '+clean(companeroNombre), M+6, y+32);
+      pdf.text('Examen presentado en pareja con: '+clean(companeroNombre)+(companeroCodigo?'  (Codigo: '+clean(companeroCodigo)+')':''), M+6, y+32);
     }
     y += estBoxH+6;
 
@@ -2019,6 +2074,18 @@ window.descargarPDFRetro = async () => {
       pdf.line(M, y, W-M, y);
       y += 6;
     });
+
+    // ── FIRMA ────────────────────────────────────────────────
+    chk(20);
+    y += 4;
+    pdf.setDrawColor(...BORDER);
+    pdf.setLineWidth(0.2);
+    pdf.line(M, y, W-M, y);
+    y += 9;
+    sf(8.5, true, TEXT2);
+    pdf.text('Norbey Danilo Muñoz', W-M, y, {align:'right'});
+    sf(7, false, TEXT2);
+    pdf.text('Examnio v0.1', W-M, y+5, {align:'right'});
 
     // ── PIE ──────────────────────────────────────────────────
     const pages = pdf.internal.getNumberOfPages();
