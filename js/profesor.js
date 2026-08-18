@@ -1,0 +1,1096 @@
+import { app } from './firebase-config.js';
+import { escHtml, normalizarTexto, renderCodigoConLineas, calcPuntaje } from './utils.js';
+import { getAuth, createUserWithEmailAndPassword,
+         signInWithEmailAndPassword, signOut,
+         onAuthStateChanged, updateProfile }
+  from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
+import { getFirestore, doc, collection, getDocs, getDoc,
+         setDoc, updateDoc, deleteDoc, serverTimestamp, onSnapshot }
+  from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+
+const auth = getAuth(app);
+const db   = getFirestore(app);
+
+// EmailJS
+const EMAILJS_SERVICE           = 'service_ho3a6su';
+const EMAILJS_TEMPLATE_SOLICITUD = 'template_qinj95m'; // A ti cuando alguien se registra
+const EMAILJS_TEMPLATE_APROBADO  = 'template_7xrt3wg'; // Al profesor cuando es aprobado
+const EMAILJS_KEY               = 'eUxqvkBt-ic5Cbxao';
+
+let GRUPOS={}, EXAMENES={}, monUnsub=null, currentTab='tab-grupos';
+let monFilter='todos', calFilter='todos';
+let CAL={examenId:null,examen:null,estudiantes:[]};
+let monStudentsCache=[];
+
+// ── HASH ROUTING ──────────────────────────────────────────────
+const ROUTES = {
+  'grupos':'tab-grupos','examenes':'tab-examenes',
+  'monitor':'tab-monitor','calificar':'tab-calificar',
+  'solicitudes':'tab-solicitudes','admin':'tab-admin'
+};
+function handleRoute(){
+  const hash=window.location.hash.replace('#/','').replace('#','');
+  if(ROUTES[hash]){
+    const el=document.querySelector(`.nav-item[onclick*="tab-${hash}"]`);
+    if(el)goTab(ROUTES[hash],el,document.getElementById('topbar-title').textContent);
+  }
+}
+window.addEventListener('hashchange',handleRoute);
+
+// ── AUTH ──────────────────────────────────────────────────────
+onAuthStateChanged(auth, async user => {
+  if(user){
+    // Verificar que esté aprobado en Firestore
+    const profSnap = await getDoc(doc(db,'profesores',user.uid));
+    if (!profSnap.exists() || profSnap.data().estado !== 'aprobado') {
+      // No aprobado — cerrar sesión y mostrar mensaje
+      await signOut(auth);
+      const err = document.getElementById('auth-error');
+      err.style.background = 'rgba(243,156,18,.15)';
+      err.style.borderColor = 'var(--warning)';
+      err.style.color = 'var(--warning)';
+      err.textContent = '⏳ Tu cuenta está pendiente de aprobación por el administrador.';
+      err.style.display = 'block';
+      return;
+    }
+    document.getElementById('auth-screen').style.display='none';
+    document.getElementById('app').classList.add('visible');
+    document.getElementById('user-name').textContent  = user.displayName||user.email.split('@')[0];
+    document.getElementById('user-email').textContent = user.email;
+    document.getElementById('user-avatar').textContent= (user.displayName||user.email)[0].toUpperCase();
+    // Mostrar sección de solicitudes solo a admins
+    const esAdmin = profSnap.data().admin === true;
+    const navSol = document.querySelector('.nav-item[onclick*="tab-solicitudes"]');
+    if (navSol) navSol.style.display = esAdmin ? 'flex' : 'none';
+    initApp();
+    if (esAdmin) cargarSolicitudes();
+  } else {
+    document.getElementById('auth-screen').style.display='flex';
+    document.getElementById('app').classList.remove('visible');
+  }
+});
+
+window.showAuthTab=(tab,el)=>{
+  document.querySelectorAll('.auth-tab').forEach(t=>t.classList.remove('active')); el.classList.add('active');
+  document.getElementById('auth-login').style.display   = tab==='login'?'block':'none';
+  document.getElementById('auth-register').style.display= tab==='register'?'block':'none';
+};
+
+window.toggleAuthPass=()=>{ const i=document.getElementById('auth-pass'); i.type=i.type==='password'?'text':'password'; };
+window.toggleRegPass =()=>{ const i=document.getElementById('reg-pass');  i.type=i.type==='password'?'text':'password'; };
+
+window.doLogin = async () => {
+  const email=v('auth-email'), pass=document.getElementById('auth-pass').value;
+  const err=document.getElementById('auth-error');
+  err.style.display='none';
+  const emailRx = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if(!email||!pass){ err.textContent='Completa todos los campos.'; err.style.display='block'; return; }
+  if(!emailRx.test(email)){ err.textContent='Ingresa un correo electrónico válido.'; err.style.display='block'; return; }
+  try{ await signInWithEmailAndPassword(auth,email,pass); }
+  catch(e){ err.textContent=tradAuth(e.code); err.style.display='block'; }
+};
+
+window.doRegister = async () => {
+  const nombre=v('reg-nombre'), email=v('reg-email'), pass=document.getElementById('reg-pass').value;
+  const err=document.getElementById('auth-error');
+  err.style.display='none';
+  if(!nombre||!email||!pass){ err.textContent='Completa todos los campos.'; err.style.display='block'; return; }
+  // Validar formato de correo
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if(!emailRegex.test(email)){ err.textContent='Ingresa un correo electrónico válido.'; err.style.display='block'; return; }
+  // Validar contraseña mínimo 6 caracteres (requerido por Firebase Auth)
+  if(pass.length < 6){ err.textContent='La contraseña debe tener al menos 6 caracteres.'; err.style.display='block'; return; }
+  try {
+    // Verificar si ya existe un admin usando un doc centinela público
+    // Esto evita necesitar leer toda la colección (permisos)
+    const centinelaRef = doc(db,'_meta','adminExiste');
+    let esElPrimero = false;
+    try {
+      const centinelaSnap = await getDoc(centinelaRef);
+      esElPrimero = !centinelaSnap.exists();
+    } catch(_) {
+      // Si no se puede leer, asumir que ya hay admin (más seguro)
+      esElPrimero = false;
+    }
+
+    // Crear cuenta en Firebase Auth
+    const cred = await createUserWithEmailAndPassword(auth, email, pass);
+    await updateProfile(cred.user, { displayName: nombre });
+
+    if (esElPrimero) {
+      // Primer registro: aprobado automáticamente como admin
+      await setDoc(doc(db,'profesores',cred.user.uid), {
+        nombre, email, estado: 'aprobado', admin: true,
+        creadoEn: serverTimestamp(), aprobadoEn: serverTimestamp(),
+      });
+      // Crear centinela para futuros registros
+      await setDoc(doc(db,'_meta','adminExiste'), { creadoEn: serverTimestamp() });
+      toast('Cuenta creada. Bienvenido, administrador.');
+    } else {
+      // Registro posterior: queda pendiente
+      await setDoc(doc(db,'profesores',cred.user.uid), {
+        nombre, email, estado: 'pendiente', admin: false,
+        creadoEn: serverTimestamp(),
+      });
+      // Cerrar sesión hasta que sea aprobado
+      await signOut(auth);
+      // Notificar por EmailJS
+      try {
+        if (window.emailjs) {
+          await window.emailjs.send(EMAILJS_SERVICE, EMAILJS_TEMPLATE_SOLICITUD, {
+            nombre, correo: email,
+            fecha: new Date().toLocaleString('es-CO'),
+          });
+        }
+      } catch(mailErr) { console.warn('Email no enviado:', mailErr); }
+
+      err.style.background = 'rgba(243,156,18,.15)';
+      err.style.borderColor = 'var(--warning)';
+      err.style.color = 'var(--warning)';
+      err.textContent = '⏳ Tu solicitud fue enviada. El administrador debe aprobarla antes de que puedas acceder.';
+      err.style.display = 'block';
+    }
+  } catch(e) { err.textContent=tradAuth(e.code); err.style.display='block'; }
+};
+
+window.doLogout = async () => { if(confirm('¿Cerrar sesión?'))await signOut(auth); };
+
+function tradAuth(code){
+  const m={'auth/user-not-found':'Correo no registrado.','auth/wrong-password':'Contraseña incorrecta.',
+    'auth/email-already-in-use':'Ese correo ya está registrado.','auth/weak-password':'Contraseña muy corta (mínimo 6 caracteres).',
+    'auth/invalid-email':'Correo inválido.'};
+  return m[code]||'Error de autenticación.';
+}
+
+async function initApp(){ await loadGrupos(); await loadExamenes(); fillExamenSelects(); poblarFiltros(); handleRoute(); }
+
+// ── NAV ───────────────────────────────────────────────────────
+window.goTab=(tabId,el,title)=>{
+  document.querySelectorAll('.tab-content').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  document.getElementById(tabId).classList.add('active');
+  el.classList.add('active');
+  document.getElementById('topbar-title').textContent=title||tabId;
+  currentTab=tabId;
+  if(tabId!=='tab-monitor'&&monUnsub){monUnsub();monUnsub=null;}
+  const slug=Object.keys(ROUTES).find(k=>ROUTES[k]===tabId);
+  if(slug)window.location.hash='/'+slug;
+};
+window.refreshCurrent=()=>{
+  if(currentTab==='tab-grupos')loadGrupos();
+  else if(currentTab==='tab-examenes')loadExamenes();
+  else if(currentTab==='tab-monitor')loadMonitor();
+};
+
+// ── GRUPOS ────────────────────────────────────────────────────
+async function loadGrupos(){
+  const snap=await getDocs(collection(db,'grupos')); GRUPOS={};
+  snap.forEach(d=>{GRUPOS[d.id]=d.data();}); renderGruposList(); fillGrupoSelects();
+}
+function renderGruposList(){
+  const el=document.getElementById('grupos-list'), keys=Object.keys(GRUPOS);
+  if(!keys.length){el.innerHTML='<div class="empty-state">No hay grupos.</div>';return;}
+  el.innerHTML=`<div class="table-wrap"><table><thead><tr><th>Universidad</th><th>Materia</th><th>Grupo</th><th>Semestre</th><th>ID</th><th></th></tr></thead><tbody>${
+    keys.map(k=>{const g=GRUPOS[k];return`<tr><td>${g.universidad}</td><td>${g.materia}</td><td>${g.grupo}</td><td>${g.año}</td><td><code style="font-size:10px;color:var(--text2)">${k}</code></td><td><button class="btn danger sm" onclick="eliminarGrupo('${k}')">Eliminar</button></td></tr>`;}).join('')
+  }</tbody></table></div>`;
+}
+window.crearGrupo=async()=>{
+  const u=v('g-univ'),m=v('g-mat'),g=v('g-grp'),a=v('g-año');
+  if(!u||!m||!g||!a){toast('Completa todos los campos.','warning');return;}
+  const id=`${sl(u)}-${sl(m)}-${sl(g)}-${a}`;
+  await setDoc(doc(db,'grupos',id),{universidad:u,materia:m,grupo:g,año:a,creadoEn:serverTimestamp()});
+  ['g-univ','g-mat','g-grp','g-año'].forEach(i=>document.getElementById(i).value='');
+  toast('Grupo creado.'); await loadGrupos();
+};
+window.eliminarGrupo=async(id)=>{
+  if(!confirm(`¿Eliminar grupo "${id}"?`))return;
+  await deleteDoc(doc(db,'grupos',id)); clearMonitor(); await loadGrupos(); toast('Grupo eliminado.');
+};
+function fillGrupoSelects(){
+  const sel=document.getElementById('ex-grupo'), cur=sel.value;
+  sel.innerHTML='<option value="">— selecciona —</option>';
+  Object.keys(GRUPOS).forEach(k=>{const g=GRUPOS[k];const o=document.createElement('option');o.value=k;o.textContent=`${g.universidad} / ${g.materia} / ${g.grupo} (${g.año})`;sel.appendChild(o);});
+  if(cur)sel.value=cur;
+}
+
+// ── ESCALA PREVIEW ────────────────────────────────────────────
+window.previewEscala=()=>{
+  const notaMin=parseFloat(document.getElementById('ex-nota-min').value)||0;
+  const notaMax=parseFloat(document.getElementById('ex-nota-max').value)||5;
+  const notaApro=parseFloat(document.getElementById('ex-nota-apro').value)||3;
+  let pts=0;
+  try{const arr=JSON.parse(document.getElementById('ex-json').value||'[]');pts=arr.reduce((s,q)=>s+(q.puntaje||0),0);}catch(_){}
+  document.getElementById('sp-pts').textContent=pts||'?';
+  document.getElementById('sp-notamax').textContent=notaMax.toFixed(1);
+  document.getElementById('sp-apro').textContent=notaApro.toFixed(1);
+};
+
+// ── EXÁMENES ──────────────────────────────────────────────────
+async function loadExamenes(){
+  const snap=await getDocs(collection(db,'examenes')); EXAMENES={};
+  snap.forEach(d=>{EXAMENES[d.id]=d.data();}); renderExamenesList();
+}
+function renderExamenesList(){
+  const el=document.getElementById('examenes-list'), keys=Object.keys(EXAMENES);
+  if(!keys.length){el.innerHTML='<div class="empty-state">No hay exámenes.</div>';return;}
+  el.innerHTML=`<div class="table-wrap"><table><thead><tr><th>Código</th><th>Título</th><th>Grupo / Semestre</th><th>Modalidad</th><th>Tiempo</th><th>Escala</th><th>Pgs</th><th>Estado</th><th>Retro</th><th>PDF</th><th></th></tr></thead><tbody>${
+    keys.map(k=>{
+      const ex=EXAMENES[k], g=GRUPOS[ex.grupoId]||{};
+      const esc=ex.escala||{notaMin:0,notaMax:5,notaApro:3};
+      const esPareja=ex.modalidad==='parejas';
+      return`<tr>
+        <td><code style="font-size:10px">${k}</code></td>
+        <td>${ex.titulo}</td>
+        <td style="font-size:11px;color:var(--text2)">${g.grupo||'—'} / ${g.año||'—'}</td>
+        <td><span class="badge ${esPareja?'badge-purple':'badge-green'}" style="font-size:10px">${esPareja?'👥 Parejas':'Individual'}</span></td>
+        <td style="font-size:11px">${ex.tiempoMinutos?ex.tiempoMinutos+' min':'∞'}</td>
+        <td style="font-size:11px">${esc.notaMin}–${esc.notaMax} (≥${esc.notaApro})</td>
+        <td>${(ex.preguntas||[]).length}</td>
+        <td><label class="toggle-wrap"><label class="toggle"><input type="checkbox" ${ex.activo?'checked':''} onchange="toggleActivo('${k}',this.checked)"><span class="toggle-slider"></span></label><span style="font-size:11px">${ex.activo?'Activo':'Inactivo'}</span></label></td>
+        <td><label class="toggle-wrap"><label class="toggle"><input type="checkbox" ${ex.retroAlimentacionVisible?'checked':''} onchange="toggleRetro('${k}',this.checked)"><span class="toggle-slider"></span></label><span style="font-size:11px">${ex.retroAlimentacionVisible?'Visible':'Oculta'}</span></label></td>
+        <td><label class="toggle-wrap"><label class="toggle"><input type="checkbox" ${ex.pdfHabilitado?'checked':''} onchange="togglePDF('${k}',this.checked)"><span class="toggle-slider"></span></label><span style="font-size:11px">${ex.pdfHabilitado?'Habilitado':'Desactivado'}</span></label></td>
+        <td style="display:flex;gap:5px;flex-wrap:wrap">
+          <button class="btn secondary sm" onclick="verJSON('${k}')">Ver JSON</button>
+          <button class="btn warning sm" onclick="editarJSON('${k}')">Editar JSON</button>
+          <button class="btn danger sm" onclick="eliminarExamen('${k}')">Eliminar</button>
+        </td></tr>`;
+    }).join('')
+  }</tbody></table></div>`;
+}
+window.crearExamen=async()=>{
+  const titulo=v('ex-titulo'), id=v('ex-id').toUpperCase().replace(/\s/g,''), grupoId=v('ex-grupo'), sub=v('ex-sub');
+  const tiempo=parseInt(document.getElementById('ex-tiempo').value)||0;
+  const notaMin=parseFloat(document.getElementById('ex-nota-min').value)||0;
+  const notaMax=parseFloat(document.getElementById('ex-nota-max').value)||5;
+  const notaApro=parseFloat(document.getElementById('ex-nota-apro').value)||3;
+  const modalidad=document.getElementById('ex-modalidad').value||'individual';
+  if(!titulo||!id||!grupoId){toast('Completa título, código y grupo.','warning');return;}
+
+  // Validar ID único — lectura fresca de Firestore justo antes de crear
+  // (el cache local EXAMENES puede estar desactualizado si otro profesor creó el examen recién)
+  const g=GRUPOS[grupoId]||{};
+  const existSnap=await getDoc(doc(db,'examenes',id));
+  if(existSnap.exists()){toast(`El código "${id}" ya existe. Usa un código diferente.`,'danger');return;}
+
+  let preguntas=[];
+  try{const t=document.getElementById('ex-json').value.trim();if(t)preguntas=JSON.parse(t);}
+  catch(_){toast('JSON inválido.','danger');return;}
+
+  await setDoc(doc(db,'examenes',id),{titulo,grupoId,subtitulo:sub,preguntas,tiempoMinutos:tiempo,activo:false,retroAlimentacionVisible:false,modalidad,escala:{notaMin,notaMax,notaApro},creadoEn:serverTimestamp()});
+  ['ex-titulo','ex-id','ex-sub','ex-json'].forEach(i=>document.getElementById(i).value='');
+  document.getElementById('ex-grupo').value='';
+  document.getElementById('ex-modalidad').value='individual';
+  document.getElementById('json-status').textContent='';
+  toast('Examen creado: '+id); await loadExamenes(); fillExamenSelects(); poblarFiltros();
+};
+window.toggleActivo=async(id,val)=>{
+  await updateDoc(doc(db,'examenes',id),{activo:val});
+  EXAMENES[id].activo=val;
+  // Actualizar etiqueta en el DOM sin recargar
+  const toggle=event.target;
+  const label=toggle.closest('.toggle-wrap').querySelector('span');
+  if(label) label.textContent=val?'Activo':'Inactivo';
+  toast(val?`"${id}" activado.`:`"${id}" desactivado.`);
+};
+window.togglePDF=async(id,val)=>{
+  await updateDoc(doc(db,'examenes',id),{pdfHabilitado:val});
+  const toggle=event.target;
+  const label=toggle.closest('.toggle-wrap').querySelector('span');
+  if(label) label.textContent=val?'Habilitado':'Desactivado';
+  toast(val?`PDF habilitado para "${id}".`:`PDF desactivado para "${id}".`);
+};
+window.toggleRetro=async(id,val)=>{
+  await updateDoc(doc(db,'examenes',id),{retroAlimentacionVisible:val});
+  // Actualizar etiqueta en el DOM sin recargar
+  const toggle=event.target;
+  const label=toggle.closest('.toggle-wrap').querySelector('span');
+  if(label) label.textContent=val?'Visible':'Oculta';
+  toast(val?'Retroalimentación visible.':'Retroalimentación oculta.');
+};
+window.eliminarExamen=async(id)=>{if(!confirm(`¿Eliminar "${id}"?`))return;await deleteDoc(doc(db,'examenes',id));clearMonitor();await loadExamenes();fillExamenSelects();poblarFiltros();toast('Examen eliminado.');};
+window.verJSON=id=>{const w=window.open('','_blank');w.document.write(`<pre style="background:#0f1117;color:#c9d1d9;padding:20px;font-size:12px;font-family:monospace">${JSON.stringify(EXAMENES[id].preguntas,null,2)}</pre>`);};
+window.validarJSON=()=>{
+  const st=document.getElementById('json-status');
+  try{const a=JSON.parse(document.getElementById('ex-json').value||'[]');if(!Array.isArray(a))throw new Error('Debe ser un array.');
+    st.textContent=`✅ ${a.length} preguntas, ${a.reduce((s,q)=>s+(q.puntaje||0),0)} pts`;st.style.color='var(--success)';previewEscala();
+  }catch(e){st.textContent='❌ '+e.message;st.style.color='var(--danger)';}
+};
+// ── FILTROS UNIVERSIDAD / SEMESTRE ───────────────────────────
+function poblarFiltros() {
+  const univs = new Set();
+  const sems  = new Set();
+
+  Object.keys(EXAMENES).forEach(k => {
+    const g = GRUPOS[EXAMENES[k].grupoId] || {};
+    if(g.universidad) univs.add(g.universidad);
+    if(g.año)         sems.add(g.año);
+  });
+
+  ['mon-filtro-univ','cal-filtro-univ'].forEach(id => {
+    const sel = document.getElementById(id); if(!sel) return;
+    const cur = sel.value;
+    sel.innerHTML = '<option value="">Todas las universidades</option>';
+    [...univs].sort().forEach(u => {
+      const o = document.createElement('option'); o.value=u; o.textContent=u; sel.appendChild(o);
+    });
+    if(cur) sel.value = cur;
+  });
+
+  ['mon-filtro-sem','cal-filtro-sem'].forEach(id => {
+    const sel = document.getElementById(id); if(!sel) return;
+    const cur = sel.value;
+    sel.innerHTML = '<option value="">Todos los semestres</option>';
+    [...sems].sort().reverse().forEach(s => {
+      const o = document.createElement('option'); o.value=s; o.textContent=s; sel.appendChild(o);
+    });
+    if(cur) sel.value = cur;
+  });
+
+  filtrarExamenesMonitor();
+  filtrarExamenesCalificar();
+}
+
+function examenesFiltered(univSelId, semSelId) {
+  const univ = document.getElementById(univSelId)?.value || '';
+  const sem  = document.getElementById(semSelId)?.value  || '';
+  return Object.keys(EXAMENES).filter(k => {
+    const g = GRUPOS[EXAMENES[k].grupoId] || {};
+    if(univ && g.universidad !== univ) return false;
+    if(sem  && g.año !== sem)          return false;
+    return true;
+  });
+}
+
+window.filtrarExamenesMonitor = () => {
+  const sel = document.getElementById('mon-examen'); if(!sel) return;
+  const cur = sel.value;
+  sel.innerHTML = '<option value="">— selecciona examen —</option>';
+  examenesFiltered('mon-filtro-univ','mon-filtro-sem').forEach(k => {
+    const ex=EXAMENES[k], g=GRUPOS[ex.grupoId]||{};
+    const o=document.createElement('option'); o.value=k;
+    o.textContent=k+' — '+ex.titulo+' ('+( g.año||'—')+')';
+    sel.appendChild(o);
+  });
+  if(cur) sel.value = cur;
+};
+
+window.filtrarExamenesCalificar = () => {
+  const sel = document.getElementById('cal-examen'); if(!sel) return;
+  const cur = sel.value;
+  sel.innerHTML = '<option value="">— selecciona examen —</option>';
+  examenesFiltered('cal-filtro-univ','cal-filtro-sem').forEach(k => {
+    const ex=EXAMENES[k], g=GRUPOS[ex.grupoId]||{};
+    const o=document.createElement('option'); o.value=k;
+    o.textContent=k+' — '+ex.titulo+' ('+(g.año||'—')+')';
+    sel.appendChild(o);
+  });
+  if(cur) sel.value = cur;
+};
+
+function fillExamenSelects(){
+  ['mon-examen','cal-examen','admin-examen','admin-ex2','rec-examen'].forEach(selId=>{
+    const sel=document.getElementById(selId); if(!sel)return;
+    const cur=sel.value; sel.innerHTML='<option value="">— selecciona —</option>';
+    Object.keys(EXAMENES).forEach(k=>{
+      const ex=EXAMENES[k], g=GRUPOS[ex.grupoId]||{};
+      const o=document.createElement('option');o.value=k;
+      o.textContent=`${k} — ${ex.titulo} (${g.año||'—'})`;
+      sel.appendChild(o);
+    });
+    if(cur)sel.value=cur;
+  });
+}
+
+// ── MONITOR ───────────────────────────────────────────────────
+let monitorFilter='todos';
+window.loadMonitor=()=>{
+  const exId=document.getElementById('mon-examen').value;
+  if(!exId){toast('Selecciona un examen.','warning');return;}
+  if(monUnsub)monUnsub();
+  document.getElementById('monitor-stats').style.display='block';
+  document.getElementById('monitor-filters').style.display='flex';
+  monUnsub=onSnapshot(collection(db,'respuestas',exId,'estudiantes'),snap=>{
+    monStudentsCache=[]; snap.forEach(d=>monStudentsCache.push({id:d.id,...d.data()}));
+    renderMonitor(monStudentsCache,EXAMENES[exId]);
+    document.getElementById('refresh-label').textContent='Actualizado: '+new Date().toLocaleTimeString('es-CO');
+  });
+};
+
+window.setFilter=(f,el)=>{
+  document.querySelectorAll('#monitor-filters .filter-btn').forEach(b=>b.classList.remove('active'));
+  el.classList.add('active'); monitorFilter=f;
+  renderMonitor(monStudentsCache,EXAMENES[document.getElementById('mon-examen').value]);
+};
+
+function applyFilter(students,f){
+  if(f==='entregados')return students.filter(s=>s.entregado);
+  if(f==='pendientes')return students.filter(s=>!s.entregado);
+  if(f==='eventos')return students.filter(s=>(s.eventos||[]).length>0);
+  if(f==='az')return [...students].sort((a,b)=>a.nombre.localeCompare(b.nombre));
+  return students;
+}
+
+function renderMonitor(students,examen){
+  document.getElementById('stat-total').textContent=students.length;
+  document.getElementById('stat-done').textContent=students.filter(s=>s.entregado).length;
+  document.getElementById('stat-events').textContent=students.filter(s=>(s.eventos||[]).length>0).length;
+  const grid=document.getElementById('monitor-grid'), numQ=(examen?.preguntas||[]).length;
+  const filtered=applyFilter(students,monitorFilter);
+  if(!filtered.length){grid.innerHTML='<div class="empty-state">Sin resultados.</div>';return;}
+  const ahora=Date.now();
+  grid.innerHTML=filtered.map(s=>{
+    const resp=Object.keys(s.respuestas||{}).length, pct=numQ?Math.round((resp/numQ)*100):0;
+    const events=s.eventos||[], descon=s.desconexiones||[];
+    const lastSeen=s.lastSeen?.seconds?s.lastSeen.seconds*1000:(s.lastSeen||0);
+    const online=s.entregado||(ahora-lastSeen<60000&&lastSeen>0);
+    const cls=s.entregado?'finished':events.length?'has-events':'';
+    const dotColor=s.entregado?'var(--accent2)':online?'var(--success)':'var(--danger)';
+
+    // Tiempo transcurrido
+    let tiempoStr='';
+    if(s.inicio?.seconds){
+      const fin=s.fin?.seconds?s.fin.seconds*1000:Date.now();
+      const mins=Math.floor((fin-s.inicio.seconds*1000)/60000);
+      tiempoStr=`⏱ ${mins} min`;
+    }
+
+    const nombreMostrado=s.codigo2?`${escHtml(s.nombre)} & ${escHtml(s.nombre2||'—')}`:escHtml(s.nombre);
+    const codigoMostrado=s.codigo2?`${escHtml(s.codigo)} · ${escHtml(s.codigo2)}`:escHtml(s.codigo);
+    return`<div class="student-card ${cls}" onclick="irACalificacion('${s.id}')">
+      <div class="student-top">
+        <div class="student-name">${s.codigo2?'👥 ':''}${nombreMostrado}</div>
+        <span class="online-dot" style="background:${dotColor}" title="${s.entregado?'Entregado':online?'En línea':'Desconectado'}"></span>
+      </div>
+      <div class="student-meta">${codigoMostrado}</div>
+      ${online&&!s.entregado?'':`<div style="font-size:10px;color:${s.entregado?'var(--accent2)':'var(--danger)'}; margin-bottom:4px">${s.entregado?'✓ Entregado':'⚡ Sin conexión'}</div>`}
+      <div style="font-size:11px;margin-bottom:4px">${resp}/${numQ} respondidas</div>
+      <div class="prog-bar-bg"><div class="prog-bar-fill" style="width:${pct}%"></div></div>
+      <div class="student-time">${tiempoStr}${descon.length?` · 🔌 ${descon.length} desconexión${descon.length>1?'es':''}`:''}</div>
+      ${events.length?`<div style="margin-top:5px">${events.slice(-3).map(e=>`<span class="event-chip" title="${e.tipo}">⚠ P${e.pregunta}</span>`).join('')}${events.length>3?`<span class="event-chip">+${events.length-3}</span>`:''}</div>`:''}
+    </div>`;
+  }).join('');
+}
+
+window.irACalificacion=(estId)=>{
+  const exId=document.getElementById('mon-examen').value;
+  if(!exId)return;
+  document.getElementById('cal-examen').value=exId;
+  const navEl=document.querySelector('.nav-item[onclick*="tab-calificar"]');
+  if(navEl)goTab('tab-calificar',navEl,'Calificar');
+  loadCalificacion().then(()=>{
+    setTimeout(()=>{
+      const el=document.getElementById('cal-'+estId);
+      if(el){el.scrollIntoView({behavior:'smooth',block:'start'});abrirAcordeon(estId);}
+    },400);
+  });
+};
+
+function clearMonitor(){
+  if(monUnsub){monUnsub();monUnsub=null;}
+  document.getElementById('monitor-stats').style.display='none';
+  document.getElementById('monitor-filters').style.display='none';
+  document.getElementById('monitor-grid').innerHTML='';
+  monStudentsCache=[];
+}
+
+// ── CALIFICACIÓN ──────────────────────────────────────────────
+window.loadCalificacion=async()=>{
+  const exId=document.getElementById('cal-examen').value;
+  if(!exId){toast('Selecciona un examen.','warning');return;}
+  document.getElementById('cal-content').innerHTML='<div class="empty-state"><span class="spinner"></span></div>';
+  const examen=EXAMENES[exId];
+  const snap=await getDocs(collection(db,'respuestas',exId,'estudiantes'));
+  const students=[]; snap.forEach(d=>students.push({id:d.id,...d.data()}));
+  CAL={examenId:exId,examen,estudiantes:students};
+  document.getElementById('btn-excel').style.display=students.length?'block':'none';
+  document.getElementById('btn-recalcular').style.display=students.length?'block':'none';
+  document.getElementById('btn-guardar-todas').style.display=students.length?'block':'none';
+  document.getElementById('cal-filters').style.display=students.length?'flex':'none';
+  renderCalificacion();
+};
+
+window.setCalFilter=(f,el)=>{
+  document.querySelectorAll('#cal-filters .filter-btn').forEach(b=>b.classList.remove('active'));
+  el.classList.add('active'); calFilter=f; renderCalificacion();
+};
+
+function applyCalFilter(students,f){
+  if(f==='entregados')return students.filter(s=>s.entregado);
+  if(f==='pendientes')return students.filter(s=>!s.entregado);
+  if(f==='az')return [...students].sort((a,b)=>a.nombre.localeCompare(b.nombre));
+  return students;
+}
+
+function buildRespMap(estudiante,preguntas){
+  const orden=estudiante.ordenPreguntas, resp=estudiante.respuestas||{};
+  if(!orden||!orden.length)return preguntas.map((q,i)=>({pregunta:q,respuesta:resp[i]}));
+  const porId={};preguntas.forEach(q=>{porId[q.id]=q;});
+  return orden.map((id,i)=>({pregunta:porId[id]||null,respuesta:resp[i]})).filter(x=>x.pregunta);
+}
+
+function renderCalificacion(){
+  const {examen,estudiantes}=CAL;
+  if(!estudiantes.length){document.getElementById('cal-content').innerHTML='<div class="empty-state">No hay respuestas aún.</div>';return;}
+  const preguntas=examen.preguntas||[], esc=examen.escala||{notaMin:0,notaMax:5,notaApro:3};
+  const ptsTotal=preguntas.reduce((s,q)=>s+q.puntaje,0);
+  const filtered=applyCalFilter(estudiantes,calFilter);
+
+  document.getElementById('cal-content').innerHTML=filtered.map((s,si)=>{
+    const mapa=buildRespMap(s,preguntas);
+    let autoScore=0; mapa.forEach(({pregunta:q,respuesta:r})=>{if(q&&q.autoCalificable)autoScore+=calcPuntaje(r,q);});
+    const notaAuto=calcNota(autoScore,ptsTotal,esc), aprueba=notaAuto>=esc.notaApro;
+    const manScore=Object.entries(s.calificacionManual||{}).filter(([k])=>!k.endsWith('_fb')).reduce((sum,[,v])=>sum+(parseFloat(v)||0),0);
+    const totalScore=autoScore+manScore;
+
+    // Preguntas como acordeón interno
+    const preguntasHtml=mapa.map(({pregunta:q,respuesta:resp},mi)=>{
+      if(!q)return'';
+      const auto=q.autoCalificable?calcPuntaje(resp,q):null;
+      const prevMan=((s.calificacionManual||{})[q.id]);
+      const typeLabel={unica:'Única',multiple:'Múltiple',verdaderoFalso:'V/F',completar:'Completar',abierto:'Abierta',emparejar:'Emparejar',ordenar:'Ordenar'}[q.tipo]||q.tipo;
+
+      let codigoHtml='';
+      if(q.codigo){ codigoHtml = renderCodigoConLineas(q.codigo, q.lenguaje||'Java'); }
+
+      const tuResp=fmtResp(resp);
+      const correcta=fmtCorrecta(q);
+
+      return`<div class="cal-pregunta">
+        <div class="cal-q-header">
+          <div class="cal-q-num">${mi+1}</div>
+          <span class="badge badge-purple">${typeLabel}</span>
+          ${auto!==null?`<span class="auto-grade">${auto.toFixed(2)}/${q.puntaje}</span>`:''}
+          ${!q.autoCalificable?`<input class="grade-input" type="number" min="0" max="${q.puntaje}" step="0.25" id="man-${s.id}-${q.id}" value="${prevMan!==undefined?prevMan:''}" placeholder="0–${q.puntaje}" oninput="recalcularNota('${s.id}')" onfocus="recalcularNota('${s.id}')">`:''}
+        </div>
+        <div class="cal-enunciado">${q.enunciado}</div>
+        ${q.imagen?`<img src="${q.imagen}" style="max-width:100%;border-radius:8px;border:1px solid var(--border);margin-bottom:10px;margin-top:6px" alt="imagen">`:''}
+        ${codigoHtml}
+        <div class="cal-resp-row">
+          <div class="cal-resp-box your"><div class="cal-resp-label">Respuesta del estudiante</div><div class="cal-resp-val">${tuResp||'<em style="color:var(--text2)">Sin respuesta</em>'}</div></div>
+          ${q.autoCalificable?`<div class="cal-resp-box correct"><div class="cal-resp-label">Respuesta correcta</div><div class="cal-resp-val">${correcta}</div></div>`:''}
+        </div>
+        ${q.retroalimentacion?`<div style="margin-top:8px;background:rgba(79,142,247,.07);border:1px solid rgba(79,142,247,.15);border-radius:8px;padding:8px 12px;"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.4px;color:var(--accent);margin-bottom:4px;font-weight:600">💡 Retroalimentación</div><div style="font-size:12px;color:var(--text);line-height:1.5">${q.retroalimentacion}</div></div>`:''}
+        ${!q.autoCalificable?`<div style="margin-top:8px;"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.4px;color:var(--accent2);margin-bottom:4px;font-weight:600">✏ Comentario del profesor</div><textarea class="grade-input" id="fb-${s.id}-${q.id}" placeholder="Escribe tu retroalimentación para el estudiante..." style="width:100%;min-height:60px;padding:8px;font-size:12px;font-family:var(--font);resize:vertical;text-align:left;">${((s.calificacionManual||{})[q.id+'_fb'])||''}</textarea></div>`:''}
+      </div>`;
+    }).join('');
+
+    return`<div class="cal-student-item" id="cal-${s.id}">
+      <div class="cal-student-header" onclick="toggleAcordeon('${s.id}',this)">
+        <div style="display:flex;flex-direction:column;gap:2px;flex:1">
+          <div style="font-size:13px;font-weight:600">${s.codigo2?'👥 ':''}${escHtml(s.nombre)}${s.codigo2?` & ${escHtml(s.nombre2||'—')}`:''} <span style="font-weight:400;color:var(--text2);font-size:11px">${escHtml(s.codigo)}${s.codigo2?' · '+escHtml(s.codigo2):''}</span></div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+            ${s.entregado?'<span class="badge badge-green">Entregado</span>':'<span class="badge badge-yellow">En progreso</span>'}
+            ${s.entregadoForzado?'<span class="badge badge-yellow">Tiempo agotado</span>':''}
+            ${(s.eventos||[]).length?`<span class="badge badge-yellow">⚠ ${s.eventos.length} evento${s.eventos.length!==1?'s':''}</span>`:''}
+            ${(()=>{
+              const tieneNota = s.calificacion!==null&&s.calificacion!==undefined;
+              const pregsManuales = preguntas.filter(q=>!q.autoCalificable);
+              const necesitaManual = pregsManuales.length > 0;
+              // Verificar que TODAS las preguntas manuales tienen calificación numérica
+              const manualCompleto = necesitaManual && pregsManuales.every(q=>{
+                const v=(s.calificacionManual||{})[q.id];
+                return v!==undefined && v!==null && !isNaN(parseFloat(v));
+              });
+              if(!s.entregado) return '';
+              if(tieneNota && (!necesitaManual || manualCompleto))
+                return '<span class="badge badge-green">✓ Nota guardada</span>';
+              if(tieneNota && necesitaManual && !manualCompleto)
+                return '<span class="badge badge-yellow">⚠ Pendiente manuales</span>';
+              if(!tieneNota && necesitaManual)
+                return '<span class="badge" style="background:rgba(139,144,168,.15);color:var(--text2)">Pendiente revision</span>';
+              if(!tieneNota)
+                return '<span class="badge" style="background:rgba(139,144,168,.15);color:var(--text2)">Sin calificar</span>';
+              return '';
+            })()}
+            <span style="font-size:11px;color:var(--text2)" id="hdr-resumen-${s.id}">Auto: <strong id="pts-auto-hdr-${s.id}">${autoScore.toFixed(2)}</strong> | Total: <strong id="pts-total-${s.id}">${totalScore.toFixed(2)}</strong>/${ptsTotal} → <strong style="color:var(--accent)" id="nota-calc-${s.id}">${notaAuto}</strong> <span class="badge ${aprueba?'badge-green':'badge-red'}" id="badge-aprueba-${s.id}">${aprueba?'Aprueba':'Reprueba'}</span></span>
+          </div>
+        </div>
+        <button class="btn success sm" onclick="event.stopPropagation();guardarNota('${s.id}')">Guardar nota</button>
+        <span class="toggle-icon">▼</span>
+      </div>
+      <div class="cal-student-body" id="body-${s.id}">
+        <div class="cal-summary">
+          <div class="cal-sum-item"><div class="cal-sum-val" id="pts-auto-${s.id}">${autoScore.toFixed(2)}</div><div class="cal-sum-lbl">Pts automáticos</div></div>
+          <div class="cal-sum-item"><div class="cal-sum-val" id="pts-manual-${s.id}">${manScore.toFixed(2)}</div><div class="cal-sum-lbl">Pts manuales</div></div>
+          <div class="cal-sum-item"><div class="cal-sum-val" id="pts-total2-${s.id}">${totalScore.toFixed(2)}</div><div class="cal-sum-lbl">Total / ${ptsTotal}</div></div>
+          <div class="cal-sum-item">
+            <input class="grade-input" type="number" min="${esc.notaMin}" max="${esc.notaMax}" step="0.1" id="nota-final-${s.id}" value="${s.calificacion!==null&&s.calificacion!==undefined?s.calificacion:''}" placeholder="${esc.notaMin}–${esc.notaMax}">
+            <div class="cal-sum-lbl">Nota final</div>
+          </div>
+        </div>
+        ${preguntasHtml}
+        ${(s.eventos||[]).length?`<div style="padding:12px 16px;background:rgba(243,156,18,.05);border-top:1px solid var(--border)"><div style="font-size:11px;color:var(--warning);margin-bottom:6px;font-weight:600">⚠ Eventos</div><div style="display:flex;flex-wrap:wrap;gap:5px">${s.eventos.map(e=>`<span class="badge badge-yellow" title="${e.tipo}">${e.hora} — P${e.pregunta}: ${e.tipo.substring(0,28)}${e.tipo.length>28?'…':''}</span>`).join('')}</div></div>`:''}
+      </div>
+    </div>`;
+  }).join('');
+
+  // Activar Prism.js
+  setTimeout(()=>{if(window.Prism)window.Prism.highlightAll();},100);
+
+  // Recalcular todos los headers inmediatamente después de renderizar
+  setTimeout(()=>{
+    filtered.forEach(s => recalcularNota(s.id));
+  }, 50);
+}
+
+window.toggleAcordeon=(estId,header)=>{
+  const body=document.getElementById('body-'+estId);
+  const wasOpen=body.classList.contains('open');
+  body.classList.toggle('open');
+  header.classList.toggle('open');
+  // Al abrir, recalcular para poblar inputs manuales guardados
+  if(!wasOpen) setTimeout(()=>recalcularNota(estId), 50);
+};
+window.abrirAcordeon=(estId)=>{
+  const body=document.getElementById('body-'+estId);
+  const header=document.querySelector(`#cal-${estId} .cal-student-header`);
+  if(body&&!body.classList.contains('open')){body.classList.add('open');if(header)header.classList.add('open');}
+};
+
+window.guardarNota=async(estId)=>{
+  const {examenId,examen,estudiantes}=CAL;
+  const s=estudiantes.find(e=>e.id===estId);
+  if(!s){toast('Estudiante no encontrado','danger');return;}
+  const esc=examen.escala||{notaMin:0,notaMax:50,notaApro:30};
+  const preguntas=examen.preguntas||[], ptsTotal=preguntas.reduce((sum,q)=>sum+q.puntaje,0);
+  const mapa=buildRespMap(s,preguntas);
+  const manual={};
+  preguntas.filter(q=>!q.autoCalificable).forEach(q=>{
+    const inp=document.getElementById(`man-${estId}-${q.id}`);
+    if(inp&&inp.value!=='')manual[q.id]=parseFloat(inp.value);
+    // Guardar también el comentario/retroalimentación del profesor
+    const fbInp=document.getElementById(`fb-${estId}-${q.id}`);
+    if(fbInp&&fbInp.value.trim()!=='')manual[q.id+'_fb']=fbInp.value.trim();
+  });
+  let totalPts=0;
+  mapa.forEach(({pregunta:q,respuesta:r})=>{
+    if(!q)return;
+    if(q.autoCalificable)totalPts+=calcPuntaje(r,q);
+    else if(manual[q.id]!==undefined)totalPts+=manual[q.id];
+  });
+  // Respetar nota manual si fue ingresada
+  const notaInput=document.getElementById(`nota-final-${estId}`);
+  let notaFinal=notaInput&&notaInput.value!==''?parseFloat(notaInput.value):calcNota(totalPts,ptsTotal,esc);
+  if(isNaN(notaFinal))notaFinal=calcNota(totalPts,ptsTotal,esc);
+  notaFinal=parseFloat(Math.min(Math.max(notaFinal,esc.notaMin),esc.notaMax).toFixed(2));
+  await updateDoc(doc(db,'respuestas',examenId,'estudiantes',s.id),{calificacion:notaFinal,calificacionManual:manual,puntajeTotal:parseFloat(totalPts.toFixed(2))});
+  const idx=estudiantes.findIndex(e=>e.id===estId);
+  if(idx>=0){CAL.estudiantes[idx].calificacion=notaFinal;CAL.estudiantes[idx].calificacionManual=manual;}
+
+  // Actualizar UI
+  const manTotal=Object.entries(manual).filter(([k])=>!k.endsWith('_fb')).reduce((s,[,v])=>s+(parseFloat(v)||0),0);
+  const el=(id)=>document.getElementById(id);
+  if(el(`pts-manual-${estId}`))el(`pts-manual-${estId}`).textContent=manTotal.toFixed(2);
+  if(el(`pts-total2-${estId}`))el(`pts-total2-${estId}`).textContent=totalPts.toFixed(2);
+  if(el(`pts-total-${estId}`))el(`pts-total-${estId}`).textContent=totalPts.toFixed(2);
+  if(el(`nota-calc-${estId}`))el(`nota-calc-${estId}`).textContent=notaFinal.toFixed(2);
+  toast(`Nota de ${s.nombre}: ${notaFinal}`);
+  // Cerrar acordeón de este estudiante
+  const body=document.getElementById('body-'+estId);
+  const header=document.querySelector(`#cal-${estId} .cal-student-header`);
+  if(body)  body.classList.remove('open');
+  if(header)header.classList.remove('open');
+  // Recargar lista para actualizar badge de estado
+  await loadCalificacion();
+};
+
+window.recalcularNota=(estId)=>{
+  const {examen,estudiantes}=CAL;
+  const s=estudiantes.find(e=>e.id===estId);
+  if(!s)return;
+  const preguntas=examen.preguntas||[], esc=examen.escala||{notaMin:0,notaMax:50,notaApro:30};
+  const ptsTotal=preguntas.reduce((sum,q)=>sum+q.puntaje,0);
+  const mapa=buildRespMap(s,preguntas);
+  let autoScore=0, manScore=0;
+  mapa.forEach(({pregunta:q,respuesta:r})=>{
+    if(!q)return;
+    if(q.autoCalificable){
+      autoScore+=calcPuntaje(r,q);
+    } else {
+      const inp=document.getElementById(`man-${estId}-${q.id}`);
+      if(inp&&inp.value!==''){
+        // Usar valor del input si fue modificado
+        manScore+=parseFloat(inp.value)||0;
+      } else if(s.calificacionManual&&s.calificacionManual[q.id]!==undefined){
+        // Recuperar del Firebase si el input está vacío
+        manScore+=s.calificacionManual[q.id];
+        if(inp)inp.value=s.calificacionManual[q.id];
+      }
+    }
+  });
+  const total=autoScore+manScore;
+  const nota=calcNota(total,ptsTotal,esc);
+  const el=(id)=>document.getElementById(id);
+  if(el(`pts-manual-${estId}`))el(`pts-manual-${estId}`).textContent=manScore.toFixed(2);
+  if(el(`pts-total2-${estId}`))el(`pts-total2-${estId}`).textContent=total.toFixed(2);
+  if(el(`pts-total-${estId}`))el(`pts-total-${estId}`).textContent=total.toFixed(2);
+  if(el(`nota-calc-${estId}`))el(`nota-calc-${estId}`).textContent=nota;
+  // Actualizar el input de nota final
+  const notaInp=el(`nota-final-${estId}`);
+  if(notaInp) notaInp.value=nota;
+
+  // Actualizar también el header del acordeón
+  if(el(`pts-auto-hdr-${estId}`))el(`pts-auto-hdr-${estId}`).textContent=autoScore.toFixed(2);
+  if(el(`pts-total-${estId}`))el(`pts-total-${estId}`).textContent=total.toFixed(2);
+  if(el(`nota-calc-${estId}`))el(`nota-calc-${estId}`).textContent=nota;
+
+  // Actualizar badge aprueba/reprueba
+  const badgeEl=el(`badge-aprueba-${estId}`);
+  if(badgeEl){
+    const aprueba=parseFloat(nota)>=esc.notaApro;
+    badgeEl.textContent=aprueba?'Aprueba':'Reprueba';
+    badgeEl.className='badge '+(aprueba?'badge-green':'badge-red');
+  }
+};
+
+// ── CALIFICACIÓN AUTO ─────────────────────────────────────────
+function calcNota(pts,total,esc){ if(!total)return esc.notaMin; return Math.min(parseFloat((esc.notaMin+(pts/total)*(esc.notaMax-esc.notaMin)).toFixed(2)),esc.notaMax); }
+
+
+// ── GUARDAR NOTA A TODOS ─────────────────────────────────────
+window.guardarTodasLasNotas = async () => {
+  const {examenId, examen, estudiantes} = CAL;
+  const entregados = estudiantes.filter(s => s.entregado);
+  if (!entregados.length) { toast('No hay estudiantes entregados.', 'warning'); return; }
+
+  // Verificar si hay preguntas manuales sin calificar
+  const preguntas = examen.preguntas || [];
+  const tieneManual = preguntas.some(q => !q.autoCalificable);
+  if (tieneManual) {
+    if (!confirm(`Este examen tiene preguntas manuales. Los estudiantes sin calificación manual recibirán solo el puntaje automático. ¿Continuar con los ${entregados.length} estudiante(s)?`)) return;
+  } else {
+    if (!confirm(`¿Guardar la nota calculada automáticamente para los ${entregados.length} estudiante(s) entregados?`)) return;
+  }
+
+  const esc      = examen.escala || { notaMin:0, notaMax:50, notaApro:30 };
+  const ptsTotal = preguntas.reduce((s,q) => s + q.puntaje, 0);
+  const btn      = document.getElementById('btn-guardar-todas');
+  btn.disabled   = true;
+  btn.textContent= '⏳ Guardando...';
+
+  let guardados = 0, errores = 0;
+
+  for (const s of entregados) {
+    try {
+      const mapa = buildRespMap(s, preguntas);
+      let autoScore = 0, manScore = 0;
+      mapa.forEach(({ pregunta:q, respuesta:r }) => {
+        if (!q) return;
+        if (q.autoCalificable) {
+          autoScore += calcPuntaje(r, q);
+        } else {
+          // Usar calificación manual ya guardada si existe
+          const prevMan = (s.calificacionManual || {})[q.id];
+          if (prevMan !== undefined) manScore += prevMan;
+        }
+      });
+      const totalPts  = autoScore + manScore;
+      const notaFinal = parseFloat(Math.min(calcNota(totalPts, ptsTotal, esc), esc.notaMax).toFixed(2));
+
+      await updateDoc(doc(db, 'respuestas', examenId, 'estudiantes', s.id), {
+        calificacion:  notaFinal,
+        puntajeTotal:  parseFloat(totalPts.toFixed(2)),
+      });
+
+      // Actualizar cache
+      const idx = CAL.estudiantes.findIndex(e => e.id === s.id);
+      if (idx >= 0) CAL.estudiantes[idx].calificacion = notaFinal;
+
+      guardados++;
+    } catch(e) {
+      console.error(`Error con ${s.nombre}:`, e);
+      errores++;
+    }
+  }
+
+  btn.disabled   = false;
+  btn.textContent= '💾 Guardar nota a todos';
+
+  toast(`✓ ${guardados} nota(s) guardadas${errores ? ` · ${errores} error(es)` : ''}.`);
+  await loadCalificacion();
+};
+
+// ── RECALCULAR TODOS ──────────────────────────────────────────
+window.recalcularTodos = async () => {
+  const {examenId, examen, estudiantes} = CAL;
+  if (!estudiantes.length) { toast('No hay estudiantes.', 'warning'); return; }
+  if (!confirm(`¿Recalcular y guardar la nota de los ${estudiantes.length} estudiante(s) usando el JSON actual del examen? Esto sobrescribe las notas guardadas.`)) return;
+
+  const preguntas = examen.preguntas || [];
+  const esc       = examen.escala || { notaMin:0, notaMax:50, notaApro:30 };
+  const ptsTotal  = preguntas.reduce((s,q) => s + q.puntaje, 0);
+
+  let actualizados = 0, errores = 0;
+  const btn = document.getElementById('btn-recalcular');
+  btn.disabled = true;
+  btn.textContent = '⏳ Recalculando...';
+
+  for (const s of estudiantes) {
+    try {
+      const mapa = buildRespMap(s, preguntas);
+
+      // Recalcular puntaje automático con el JSON actual
+      let autoScore = 0;
+      mapa.forEach(({ pregunta: q, respuesta: r }) => {
+        if (q && q.autoCalificable) autoScore += calcPuntaje(r, q);
+      });
+
+      // Mantener calificaciones manuales existentes
+      const manual = s.calificacionManual || {};
+      let manScore  = Object.entries(manual).filter(([k])=>!k.endsWith('_fb')).reduce((s,[,v])=>s+(parseFloat(v)||0),0);
+      const totalPts = autoScore + manScore;
+      const notaFinal = Math.min(calcNota(totalPts, ptsTotal, esc), esc.notaMax);
+
+      await updateDoc(doc(db,'respuestas',examenId,'estudiantes',s.id), {
+        puntajeTotal:  parseFloat(totalPts.toFixed(2)),
+        calificacion:  notaFinal,
+      });
+      actualizados++;
+    } catch(e) {
+      console.error(`Error con ${s.nombre}:`, e);
+      errores++;
+    }
+  }
+
+  btn.disabled = false;
+  btn.textContent = '🔄 Recalcular y guardar todas las notas';
+
+  toast(`✓ ${actualizados} nota(s) actualizadas${errores ? ` · ${errores} error(es)` : ''}.`);
+
+  // Recargar vista
+  await loadCalificacion();
+};
+
+// ── EXCEL ─────────────────────────────────────────────────────
+window.descargarExcel=()=>{
+  const {examen,estudiantes}=CAL;
+  if(!estudiantes.length){toast('Sin datos.','warning');return;}
+  const esc=examen.escala||{notaMin:0,notaMax:5,notaApro:3};
+  const ptsTotal=(examen.preguntas||[]).reduce((s,q)=>s+q.puntaje,0);
+  const rows=[['Nombre','Correo','Código','Modalidad','Entregado','Forzado','Pts obtenidos','Pts totales','Nota','Aprueba','Eventos','Desconexiones','Inicio','Fin']];
+  estudiantes.forEach(s=>{
+    const auto=calcAuto(s.respuestas||{},s,examen.preguntas||[]);
+    const nota=s.calificacion!==null&&s.calificacion!==undefined?s.calificacion:calcNota(auto,ptsTotal,esc);
+    const fmtTs=ts=>{if(!ts)return'—';try{if(ts.toDate)return ts.toDate().toLocaleString('es-CO');if(ts.seconds)return new Date(ts.seconds*1000).toLocaleString('es-CO');}catch(_){}return'—';};
+    const comunes=[s.entregado?'Sí':'No',s.entregadoForzado?'Sí':'No',auto.toFixed(2),ptsTotal,nota,nota>=esc.notaApro?'Sí':'No',(s.eventos||[]).length,(s.desconexiones||[]).length,fmtTs(s.inicio),fmtTs(s.fin)];
+    if(s.codigo2){
+      // Examen en pareja: una fila por cada integrante, con la misma nota compartida
+      rows.push([s.nombre,s.correo||'',s.codigo,'Parejas',...comunes]);
+      rows.push([s.nombre2||'',s.correo2||'',s.codigo2,'Parejas',...comunes]);
+    } else {
+      rows.push([s.nombre,s.correo||'',s.codigo,'Individual',...comunes]);
+    }
+  });
+  const csv=rows.map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
+  const blob=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8;'});
+  const url=URL.createObjectURL(blob), a=document.createElement('a');
+  a.href=url;a.download=`notas-${CAL.examenId}.csv`;a.click();URL.revokeObjectURL(url);
+  toast('Descargado.');
+};
+function calcAuto(resp,s,preguntas){
+  const mapa=buildRespMap(s,preguntas);
+  return mapa.reduce((sum,{pregunta:q,respuesta:r})=>{if(q&&q.autoCalificable)sum+=calcPuntaje(r,q);return sum;},0);
+}
+
+// ── ADMIN ─────────────────────────────────────────────────────
+window.eliminarIntentos=async()=>{
+  const exId=document.getElementById('admin-examen').value;
+  if(!exId){toast('Selecciona un examen.','warning');return;}
+  if(!confirm(`¿Eliminar TODOS los intentos de "${exId}"?`))return;
+  const snap=await getDocs(collection(db,'respuestas',exId,'estudiantes'));
+  await Promise.all([...snap.docs].map(d=>deleteDoc(d.ref)));
+  clearMonitor(); toast(`${snap.size} intento(s) eliminados.`);
+};
+window.eliminarIntentoEspecifico=async()=>{
+  const exId=document.getElementById('admin-ex2').value, estId=v('admin-est-id');
+  if(!exId||!estId){toast('Completa examen e ID.','warning');return;}
+  if(!confirm(`¿Eliminar intento de "${estId}"?`))return;
+  try{await deleteDoc(doc(db,'respuestas',exId,'estudiantes',estId));document.getElementById('admin-est-id').value='';clearMonitor();toast('Intento eliminado.');}
+  catch(_){toast('No se encontró.','danger');}
+};
+window.limpiarTodo=async()=>{
+  if(!confirm('⚠ ¿Eliminar TODAS las respuestas?'))return;
+  if(!confirm('Segunda confirmación: ¿seguro?'))return;
+  let total=0;
+  for(const exId of Object.keys(EXAMENES)){
+    const snap=await getDocs(collection(db,'respuestas',exId,'estudiantes'));
+    await Promise.all([...snap.docs].map(d=>deleteDoc(d.ref)));
+    total+=snap.size;
+  }
+  clearMonitor(); toast(`${total} intento(s) eliminados.`);
+};
+window.generarTempPass=async()=>{
+  const exId=v('rec-examen'), estId=v('rec-est-id');
+  if(!exId||!estId){toast('Completa examen e ID.','warning');return;}
+  const chars='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  const temp=Array.from({length:6},()=>chars[Math.floor(Math.random()*chars.length)]).join('');
+  try{
+    await updateDoc(doc(db,'respuestas',exId,'estudiantes',estId),{tempPass:temp});
+    document.getElementById('temp-pass-result').textContent=`Contraseña temporal: ${temp} (un solo uso)`;
+    toast('Contraseña generada.');
+  }catch(_){toast('No se encontró ese estudiante.','danger');}
+};
+
+// ── SOLICITUDES ───────────────────────────────────────────────
+async function cargarSolicitudes() {
+  const snap = await getDocs(collection(db,'profesores'));
+  const pendientes = [], aprobados = [];
+  snap.forEach(d => {
+    const p = {...d.data(), uid: d.id};
+    if (p.estado === 'pendiente') pendientes.push(p);
+    else if (p.estado === 'aprobado') aprobados.push(p);
+  });
+
+  // Badge en sidebar
+  const badge = document.getElementById('badge-solicitudes');
+  if (badge) {
+    badge.style.display = pendientes.length ? 'inline' : 'none';
+    badge.textContent = pendientes.length;
+  }
+
+  // Lista de pendientes
+  const listEl = document.getElementById('solicitudes-list');
+  if (listEl) {
+    if (!pendientes.length) {
+      listEl.innerHTML = '<div class="empty-state">No hay solicitudes pendientes.</div>';
+    } else {
+      listEl.innerHTML = `<div class="table-wrap"><table>
+        <thead><tr><th>Nombre</th><th>Correo</th><th>Fecha solicitud</th><th>Acciones</th></tr></thead>
+        <tbody>${pendientes.map(p => `<tr>
+          <td>${p.nombre}</td>
+          <td>${p.email}</td>
+          <td style="font-size:11px;color:var(--text2)">${p.creadoEn?.seconds?new Date(p.creadoEn.seconds*1000).toLocaleString('es-CO'):'—'}</td>
+          <td style="display:flex;gap:6px">
+            <button class="btn success sm" onclick="aprobarProfesor('${p.uid}','${p.nombre}','${p.email}')">✓ Aprobar</button>
+            <button class="btn danger sm" onclick="rechazarProfesor('${p.uid}','${p.nombre}')">✗ Rechazar</button>
+          </td>
+        </tr>`).join('')}</tbody>
+      </table></div>`;
+    }
+  }
+
+  // Lista de aprobados
+  const aprobEl = document.getElementById('profesores-list');
+  if (aprobEl) {
+    if (!aprobados.length) {
+      aprobEl.innerHTML = '<div class="empty-state">Sin profesores aprobados aún.</div>';
+    } else {
+      aprobEl.innerHTML = `<div class="table-wrap"><table>
+        <thead><tr><th>Nombre</th><th>Correo</th><th>Rol</th><th></th></tr></thead>
+        <tbody>${aprobados.map(p => `<tr>
+          <td>${p.nombre}</td>
+          <td>${p.email}</td>
+          <td>${p.admin?'<span class="badge badge-purple">Admin</span>':'<span class="badge badge-blue">Profesor</span>'}</td>
+          <td>${!p.admin?`<button class="btn danger sm" onclick="revocarProfesor('${p.uid}','${p.nombre}')">Revocar</button>`:'—'}</td>
+        </tr>`).join('')}</tbody>
+      </table></div>`;
+    }
+  }
+}
+
+window.aprobarProfesor = async (uid, nombre, email) => {
+  if (!confirm(`¿Aprobar acceso a ${nombre}?`)) return;
+  await updateDoc(doc(db,'profesores',uid), { estado:'aprobado', aprobadoEn:serverTimestamp() });
+
+  // Notificar al profesor aprobado por email
+  // Crea en EmailJS una plantilla para notificar al profesor (variables: to_name, to_email)
+  try {
+    if (window.emailjs) {
+      await window.emailjs.send(EMAILJS_SERVICE, EMAILJS_TEMPLATE_APROBADO, {
+        to_name:  nombre,
+        to_email: email,
+        fecha:    new Date().toLocaleString('es-CO'),
+      });
+      toast(`${nombre} aprobado y notificado por email.`);
+    } else {
+      toast(`${nombre} aprobado.`);
+    }
+  } catch(mailErr) {
+    console.warn('Email de aprobación no enviado:', mailErr);
+    toast(`${nombre} aprobado. (Email no enviado)`);
+  }
+  cargarSolicitudes();
+};
+window.rechazarProfesor = async (uid, nombre) => {
+  if (!confirm(`¿Rechazar y eliminar solicitud de ${nombre}?`)) return;
+  await deleteDoc(doc(db,'profesores',uid));
+  // Nota: la cuenta en Firebase Auth sigue existiendo pero sin doc en Firestore no puede acceder
+  toast(`Solicitud de ${nombre} rechazada.`); cargarSolicitudes();
+};
+window.revocarProfesor = async (uid, nombre) => {
+  if (!confirm(`¿Revocar acceso de ${nombre}? No podrá entrar al panel.`)) return;
+  await updateDoc(doc(db,'profesores',uid), { estado:'revocado' });
+  toast(`Acceso de ${nombre} revocado.`); cargarSolicitudes();
+};
+
+// ── EDITAR JSON ───────────────────────────────────────────────
+let editandoExamenId = null;
+
+window.editarJSON = (id) => {
+  editandoExamenId = id;
+  document.getElementById('edit-json-id').textContent = id;
+  document.getElementById('edit-json-textarea').value =
+    JSON.stringify(EXAMENES[id].preguntas || [], null, 2);
+  document.getElementById('edit-json-status').textContent = '';
+  document.getElementById('modal-editar-json').style.display = 'flex';
+};
+
+window.cerrarEditarJSON = () => {
+  document.getElementById('modal-editar-json').style.display = 'none';
+  editandoExamenId = null;
+};
+
+window.validarEditJSON = () => {
+  const st = document.getElementById('edit-json-status');
+  try {
+    const a = JSON.parse(document.getElementById('edit-json-textarea').value);
+    if (!Array.isArray(a)) throw new Error('Debe ser un array.');
+    const pts = a.reduce((s,q) => s + (q.puntaje||0), 0);
+    st.textContent = `✅ Válido — ${a.length} preguntas, ${pts} pts`;
+    st.style.color = 'var(--success)';
+  } catch(e) {
+    st.textContent = '❌ ' + e.message;
+    st.style.color = 'var(--danger)';
+  }
+};
+
+window.guardarEditJSON = async () => {
+  if (!editandoExamenId) return;
+  const st = document.getElementById('edit-json-status');
+  let preguntas;
+  try {
+    preguntas = JSON.parse(document.getElementById('edit-json-textarea').value);
+    if (!Array.isArray(preguntas)) throw new Error('Debe ser un array.');
+  } catch(e) {
+    st.textContent = '❌ JSON inválido: ' + e.message;
+    st.style.color = 'var(--danger)';
+    return;
+  }
+  if (!confirm(`¿Guardar los cambios en "${editandoExamenId}"? Los nuevos intentos usarán este JSON. Los intentos ya registrados no se recalculan automáticamente.`)) return;
+  await updateDoc(doc(db,'examenes',editandoExamenId), { preguntas });
+  EXAMENES[editandoExamenId].preguntas = preguntas;
+  cerrarEditarJSON();
+  toast('JSON actualizado: ' + editandoExamenId);
+  await loadExamenes(); fillExamenSelects();
+};
+
+// ── UTILS ─────────────────────────────────────────────────────
+const v  = id=>document.getElementById(id).value.trim();
+const sl = s=>s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]/g,'-').replace(/-+/g,'-').replace(/^-|-$/g,'');
+const fmtResp=r=>{if(r===undefined||r===null)return'—';if(typeof r==='boolean')return r?'Verdadero':'Falso';if(Array.isArray(r))return r.map(s=>escHtml(String(s)).replace(/\n/g,'<br>')).join(' / ');if(typeof r==='object')return Object.entries(r).map(([k,vl])=>`${parseInt(k)+1}→${escHtml(String(vl))}`).join(' | ');return escHtml(String(r)).replace(/\n/g,'<br>');};
+const fmtCorrecta=q=>{switch(q.tipo){case 'unica':return (q.correcta||'—').replace(/\n/g,'<br>');case 'multiple':return(q.correctas||[]).join(' / ');case 'verdaderoFalso':return q.correcta?'Verdadero':'Falso';case 'emparejar':return(q.pares||[]).map(p=>p.izquierda+' → '+p.derecha).join('<br>');case 'ordenar':return(q.correctos||[]).join(' → ');case 'completar':return(q.espacios||[]).join(' / ');default:return'—';}};
+
+let toastTimer;
+window.toast=(msg,type='success')=>{
+  clearTimeout(toastTimer);const old=document.querySelector('.toast');if(old)old.remove();
+  const el=document.createElement('div');el.className='toast';
+  el.style.borderColor=type==='danger'?'var(--danger)':type==='warning'?'var(--warning)':'var(--success)';
+  el.textContent=msg;document.body.appendChild(el);
+  toastTimer=setTimeout(()=>el.remove(),3500);
+};
+
+
+
+// Normalizar texto para comparación: minúsculas, sin tildes ni caracteres especiales
+
+
