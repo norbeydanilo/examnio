@@ -1,0 +1,14 @@
+# Sistema operativo / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Dependencias / logs
+node_modules/
+*.log
+npm-debug.log*
+
+# Variables de entorno / secretos
+.env
+.env.local
