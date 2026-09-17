@@ -540,8 +540,8 @@ pre[class*="language-"] {
           <div class="card-body">
             <p style="font-size:13px;color:var(--text2);margin-bottom:12px">Genera una contraseña temporal de un solo uso para que el estudiante pueda reacceder.</p>
             <div class="grid-2">
-              <div class="field"><label>Examen</label><select id="rec-examen" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:8px 11px;font-family:var(--font);outline:none;"><option value="">— selecciona —</option></select></div>
-              <div class="field"><label>ID del estudiante</label><input id="rec-est-id" placeholder="ej: 1001234567-ana-maria-torres"></div>
+              <div class="field"><label>Examen</label><select id="rec-examen" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:8px 11px;font-family:var(--font);outline:none;" onchange="poblarEstudiantesDropdown(this.value,'rec-est-id')"><option value="">— selecciona —</option></select></div>
+              <div class="field"><label>Estudiante</label><select id="rec-est-id" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:8px 11px;font-family:var(--font);outline:none;"><option value="">— primero selecciona un examen —</option></select></div>
             </div>
             <div class="btn-row">
               <button class="btn warning" onclick="generarTempPass()">🔑 Generar contraseña temporal</button>
@@ -553,8 +553,8 @@ pre[class*="language-"] {
           <div class="card-header"><h3>Eliminar intento específico</h3></div>
           <div class="card-body">
             <div class="grid-2">
-              <div class="field"><label>Examen</label><select id="admin-ex2" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:8px 11px;font-family:var(--font);outline:none;"><option value="">— selecciona —</option></select></div>
-              <div class="field"><label>ID del estudiante</label><input id="admin-est-id" placeholder="ej: 1001234567-ana-torres"></div>
+              <div class="field"><label>Examen</label><select id="admin-ex2" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:8px 11px;font-family:var(--font);outline:none;" onchange="poblarEstudiantesDropdown(this.value,'admin-est-id')"><option value="">— selecciona —</option></select></div>
+              <div class="field"><label>Estudiante</label><select id="admin-est-id" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:8px 11px;font-family:var(--font);outline:none;"><option value="">— primero selecciona un examen —</option></select></div>
             </div>
             <button class="btn danger" onclick="eliminarIntentoEspecifico()">🗑 Eliminar este intento</button>
           </div>
@@ -1585,6 +1585,31 @@ window.limpiarTodo=async()=>{
   }
   clearMonitor(); toast(`${total} intento(s) eliminados.`);
 };
+// ── Poblar el dropdown de estudiantes (individuales y parejas) al elegir un examen ──
+window.poblarEstudiantesDropdown = async (exId, targetSelId) => {
+  const sel = document.getElementById(targetSelId);
+  sel.innerHTML = '<option value="">— cargando... —</option>';
+  if (!exId) { sel.innerHTML = '<option value="">— primero selecciona un examen —</option>'; return; }
+  try {
+    const snap = await getDocs(collection(db,'respuestas',exId,'estudiantes'));
+    if (snap.empty) { sel.innerHTML = '<option value="">(sin intentos registrados en este examen)</option>'; return; }
+    const opts = [];
+    snap.forEach(d=>{
+      const s = d.data();
+      const esPareja = !!s.codigo2;
+      const label = esPareja
+        ? `👥 ${s.nombre} & ${s.nombre2||'—'}  ·  ${s.codigo} · ${s.codigo2}`
+        : `${s.nombre}  ·  ${s.codigo}`;
+      opts.push({ id: d.id, label });
+    });
+    opts.sort((a,b)=>a.label.localeCompare(b.label,'es'));
+    sel.innerHTML = '<option value="">— selecciona —</option>' + opts.map(o=>`<option value="${o.id}">${o.label}</option>`).join('');
+  } catch(_) {
+    sel.innerHTML = '<option value="">(error al cargar)</option>';
+    toast('No se pudo cargar la lista de estudiantes.','danger');
+  }
+};
+
 window.generarTempPass=async()=>{
   const exId=v('rec-examen'), estId=v('rec-est-id');
   if(!exId||!estId){toast('Completa examen e ID.','warning');return;}
